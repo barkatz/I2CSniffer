@@ -7,8 +7,16 @@
 
 #ifndef DRIVERS_I2C_I2C_H_
 #define DRIVERS_I2C_I2C_H_
-#include "port.h"
+#include "../port.h"
 
+
+
+enum BITS {
+	ZERO_BIT = 0,
+	ONE_BIT = 1,
+	START_BIT = 2,
+	STOP_BIT = 3,
+};
 /*
  * A generic GPIO
  */
@@ -23,18 +31,17 @@ public:
 	I2CSniffer(uint32_t SDA_Port, uint32_t SDA_Pin,
 				uint32_t SCL_Port, uint32_t SCL_Pin);
 
-	bool Update();
+	void Update();
+
+	BITS m_bits[0x100]; // TODO This should be a cyclic queue
+	uint32_t m_bitCount;
 protected:
 	InPort m_sdaPort;
 	InPort m_sclPort;
+	uint32_t m_sdaVal;
+	uint32_t m_sclVal;
 
 };
-
-#endif /* DRIVERS_PORT_H_ */
-
-
-
-
 
 
 #endif /* DRIVERS_I2C_I2C_H_ */
