@@ -12,6 +12,8 @@
 void __attribute__((weak))
 Default_Handler(void);
 
+
+
 // Forward declaration of the specific IRQ handlers. These are aliased
 // to the Default_Handler, which is a 'forever' loop. When the application
 // defines a handler (with the same name), this will automatically take
@@ -319,12 +321,19 @@ pHandler __isr_vectors[] =
 // Processor ends up here if an unexpected interrupt occurs or a specific
 // handler is not present in the application code.
 
+
+
 void __attribute__ ((section(".after_vectors")))
 Default_Handler(void)
 {
-  while (1)
-    {
-    }
+	int i =0;
+  while (1) {
+	  i++;
+  }
 }
+
+
+
+
 
 // ----------------------------------------------------------------------------
