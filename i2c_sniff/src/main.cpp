@@ -43,6 +43,12 @@
  */
 I2CSniffer i2c(SDA_PORT, SDA_PIN, SCL_PORT, SCL_PIN, 0x1000);
 
+void print_hex(unsigned int a){
+	char temp_buf[0x100];
+	snprintf(temp_buf, sizeof(temp_buf), "0x%x ", a);
+	puts(temp_buf);
+}
+
 
 void init_lcd(void) {
 	// Init lcd log.
@@ -84,6 +90,17 @@ void init_buttons() {
 
 
 
+
+uint8_t pack_byte(BITS* bits) {
+	uint8_t byte = 0;
+	for (int8_t bit_index = 7, i = 0; bit_index>=0; ++i, bit_index--) {
+		if (bits[i] != ZERO_BIT && bits[i]!= ONE_BIT) {
+			puts("PROBLEM");
+		}
+		byte |= (uint8_t) (bits[i]<< bit_index);
+	}
+	return byte;
+}
 /**
  *  Button handler (KEY button is IRQ-15)
  *  This prints the buffer of the sniffed I2C msgs to the screen.
@@ -137,62 +154,95 @@ void EXTI15_10_IRQHandler(void) {
 	*/
 	for (i=0; i<size; ++i) {
 		if (bits[i]== START_BIT) {
-			i++; // skip the start bit.
+
+
 			break;
 		} else {
 			puts("?");
 		}
 	}
 
-	/*
-	 * Packet should look like this:
-	 * | START BIT | <--- 7 BITS ADDRESS --> | R/W BIT | N/ACK | .... | STOP
-	 * We validate that the packet size is ok.
-	 */
-	if (size < (1 + 7 + 1 + 1 + 1)) {
-		puts("Packet size is too small... ");
-		return;
-	}
-
-	/*
-	 * Now we go and pack the 7 bits of address.
-	 * the MSB comes first
-	 */
-	uint8_t address = 0;
-	char temp_buf[0x100];
-	for (uint8_t bit_index = 7; bit_index>0; ++i, bit_index--) {
-		if (bits[i] != ZERO_BIT && bits[i]!= ONE_BIT) {
-			puts("PROBLEM");
+	while (size > 0) {
+		if (bits[i] != START_BIT) {
+			puts("OUT OF SYNC");
+			return;
+		} else {
+			i++;
+			size--;
+			puts("START ");
+		}
+		/*
+		 * Packet should look like this:
+		 * | START BIT | <--- 7 BITS ADDRESS --> | R/W BIT | N/ACK | .... | STOP
+		 * We validate that the packet size is ok.
+		 */
+		if (size < (1 + 7 + 1 + 1 + 1)) {
+			puts("Packet size is too small... ");
+			return;
 		}
 
-		address |= (uint8_t) (bits[i]<< bit_index);
+		/*
+		 * Now we go and pack the 7 bits of address + 1 bit of R/W
+		 * the MSB comes first
+		 */
+		uint8_t address = pack_byte(bits + i);
+		print_hex(address);
+		i += 8;
+		size -= 8;
+
+		uint8_t is_write = !(address&0x1);
+		if (is_write) {
+			puts("W ");
+		} else {
+			puts("R ");
+		}
+
+		/*
+		 *Next bit should be NACK/ACK
+		 */
+		uint8_t is_nack = bits[i++];
+		size--;
+		if (is_nack) {
+			puts("NACK ");
+		} else {
+			puts("ACK ");
+		}
+
+		/**
+		 * If master is reading, keep on reading untill a NACK is seen.
+		 */
+		while (!is_nack && !is_write){
+			/*
+			 * Read a byte
+			 */
+			uint8_t byte = pack_byte(bits + i);
+			print_hex(byte);
+			i += 8;
+			size -= 8;
+
+			/*
+			 * Next bit should be NACK/ACK
+			 */
+			is_nack = bits[i++];
+			size--;
+			if (is_nack) {
+				puts("NACK ");
+			} else {
+				puts("ACK ");
+			}
+		}
+
+		// We should have hit the STOP bit...
+		if (bits[i] != STOP_BIT) {
+			puts("No stop bit? ");
+		} else {
+			puts("STOP ");
+		}
+		i++;
+		size--;
+		puts("\n");
 	}
-	snprintf(temp_buf, sizeof(temp_buf), " 0x%x ", address);
-	puts(temp_buf);
 
-	/*
-	 * Next bit is read/write
-	 */
-	uint8_t is_write = bits[i++];
-	if (is_write) {
-		puts(" W ");
-	} else {
-		puts(" R ");
-	}
-
-	/*
-	 *Next bit should be NACK/ACK
-	 */
-	uint8_t is_nack = bits[i++];
-	if (is_nack) {
-		puts(" NACK ");
-	} else {
-		puts(" ACK ");
-	}
-
-	// Pack
-
-	puts("\n");
 }
 #ifdef __cplusplus
 }

@@ -31,6 +31,9 @@ I2CSniffer::I2CSniffer(uint32_t SDA_Port, uint32_t SDA_Pin,
  * Read lines and extract bits
  */
 void I2CSniffer::Update() {
+	static BITS bit;
+	static bool rise_detected = false;
+//	static bool should_ruin_address = false;
 	// Save old values
 	uint32_t  oldsda = m_sdaVal;
 	uint32_t  oldscl = m_sclVal;
@@ -47,6 +50,8 @@ void I2CSniffer::Update() {
 	// If scl is still high, and sda is pulled low --> This is the start bit
 	if ( (m_sclVal == 1) &&
 			(m_sdaVal == 0) && (oldsda == 1) ) {
+		rise_detected = false;
+//		should_ruin_address = true;
 		m_buffer.push(START_BIT);
 		return;
 	}
@@ -55,6 +60,8 @@ void I2CSniffer::Update() {
 	// If scl is still high, and sda is pulled high--> This is the stopbit
 	if ( (m_sclVal == 1) &&
 			(m_sdaVal == 1) && (oldsda == 0) ) {
+		rise_detected = false;
+//		should_ruin_address = false;
 		m_buffer.push(STOP_BIT);
 		return;
 	}
@@ -63,10 +70,22 @@ void I2CSniffer::Update() {
 	 * Check regular bits.
 	 * Regular bits are transformed in the following way:
 	 * SDA is set up when SCL is LOW with the right bit (0/1). When SDA is set to the desired value,
-	 * then SCL is freed (i.e pulled up) by the transmitter, and after some time pulled low again to xmit the next bit
+	 * then SCL is freed (i.e pulled up) by the transmitter, and after some time pulled low again to xmit the next bit.
+	 * We make sure we see both rising and falling edge to avoid adding the start/stop bits as bits....
 	 */
 	if ((m_sclVal == 1) && (oldscl == 0)) {
-		m_buffer.push((BITS) m_sdaVal);
+		bit = (BITS) m_sdaVal;
+//		// ruin the first address...
+//		if (bit == ONE_BIT && should_ruin_address) {
+//
+//		}
+		rise_detected = true;
+	}
+	if ((m_sclVal == 0) && (oldscl == 1)) {
+		if (rise_detected) {
+			m_buffer.push(bit);
+		}
+		rise_detected = false;
 	}
 
 }
