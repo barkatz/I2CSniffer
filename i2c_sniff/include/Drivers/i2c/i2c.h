@@ -18,15 +18,7 @@ enum BITS {
 	STOP_BIT = 3,
 };
 
-enum I2C_STATE{
-	I2C_START_BIT 			= 0,
-	I2C_ADDRESS   			= 1,
-	I2C_READ_WRITE			= 2,
-	I2C_ADDR_ACK			= 3,
-	I2C_DATA  				= 4,
-	I2C_DATA_ACK			= 5,
-	//I2C_STOP_BIT 			= 6,
-};
+
 /*
  * A generic GPIO
  */
@@ -41,11 +33,16 @@ public:
 	I2CSniffer(uint32_t SDA_Port, uint32_t SDA_Pin,
 				uint32_t SCL_Port, uint32_t SCL_Pin, const size_t m_size);
 
+	/*
+	 * When the next bits ONE is transmitted on the line -> pull it to zero.
+	 */
+	void flip_next_one_bit();
 	void init();
 	/**
 	 * Samples the SDA/SCL lines and update the buffer with new bits
+	 * returns true if a new bit was captured.
 	 */
-	void Update();
+	bool Update();
 
 	CyclicBuffer<BITS> m_buffer;
 protected:
@@ -56,9 +53,6 @@ protected:
 	uint32_t m_currSclVal;
 	uint32_t m_oldSdaVal;
 	uint32_t m_oldSclVal;
-	I2C_STATE m_state;
-
-
 };
 
 
