@@ -246,8 +246,8 @@ void do_input() {
 
 			// Parse the bit - this returns true at STOP bit
 			if (examine_bits(unprocessed_bits, i)) {
-				// If we hit stop bits, print, clear buffer and preapre for the next.
-				print_i2c_buffer(unprocessed_bits, i-1);
+				// If we hit stop bits, print, clear buffer and prepare for the next.
+				print_i2c_buffer(unprocessed_bits, i);
 				i = 0;
 			}
 
@@ -274,130 +274,37 @@ uint8_t pack_byte(BITS* bits) {
 	return byte;
 }
 
-
+/*
+ * Prints the bytes from I2C buffer
+ */
 void print_i2c_buffer(BITS* buf_bits, size_t size) {
-	// If there are none, bail
-	if (!size) {
-		return;
-	}
+	uint8_t temp_byte;
+	bool 	acked;
 
-	size_t i;
-	/*
-	 * Show it as bits
-	 */
-	for (i=0; i<size; ++i) {
-		switch (buf_bits[i]){
-			case ZERO_BIT:
-				puts("0-");
-				break;
-			case ONE_BIT:
-				puts("1-");
-				break;
-			case START_BIT:
-				puts("[");
-				break;
-			case STOP_BIT:
-				puts("]");
-				break;
-			default:
-				puts("*");
-				break;
+	if (!size) { return; }
+
+	for (size_t i = 0; i < size; ) {
+		// In this case we are waiting for start bit. is the last bit captured a start bit?
+		if (buf_bits[i] == START_BIT) {
+			puts("[");
+			i++;
+		} else if  (buf_bits[i] == STOP_BIT) {
+			puts("]");
+			i++;
+		} else {
+			temp_byte = pack_byte(buf_bits+i);
+			i += 8;
+			acked = (buf_bits[i] == ZERO_BIT);
+			i++;
+			print_hex(temp_byte);
+			if (acked) {
+				puts("ACK ");
+			} else {
+				puts("NACK ");
+			}
 		}
 	}
 	puts("\n");
-
-	/*
-	* Going over the bits, this time parsing the entire thing as bytes
-	* First we search for the start bit
-	*/
-	for (i=0; i<size; ++i) {
-		if (buf_bits[i]== START_BIT) {
-			break;
-		} else {
-			puts("?");
-		}
-	}
-
-	while (size > 0) {
-		if (buf_bits[i] != START_BIT) {
-			puts("OUT OF SYNC");
-			return;
-		} else {
-			i++;
-			size--;
-			puts("START ");
-		}
-		/*
-		 * Packet should look like this:
-		 * | START BIT | <--- 7 BITS ADDRESS --> | R/W BIT | N/ACK | .... | STOP
-		 * We validate that the packet size is ok.
-		 */
-		if (size < (1 + 7 + 1 + 1 + 1)) {
-			puts("Packet size is too small... ");
-			return;
-		}
-
-		/*
-		 * Now we go and pack the 7 bits of address + 1 bit of R/W
-		 * the MSB comes first
-		 */
-		uint8_t address = pack_byte(buf_bits + i);
-		print_hex(address);
-		i += 8;
-		size -= 8;
-
-		uint8_t is_write = !(address&0x1);
-		if (is_write) {
-			puts("W ");
-		} else {
-			puts("R ");
-		}
-
-		/*
-		 *Next bit should be NACK/ACK
-		 */
-		uint8_t is_nack = buf_bits[i++];
-		size--;
-		if (is_nack) {
-			puts("NACK ");
-		} else {
-			puts("ACK ");
-		}
-
-		/**
-		 * If master is reading, keep on reading untill a NACK is seen.
-		 */
-		while (!is_nack && !is_write){
-			/*
-			 * Read a byte
-			 */
-			uint8_t byte = pack_byte(buf_bits + i);
-			print_hex(byte);
-			i += 8;
-			size -= 8;
-
-			/*
-			 * Next bit should be NACK/ACK
-			 */
-			is_nack = buf_bits[i++];
-			size--;
-			if (is_nack) {
-				puts("NACK ");
-			} else {
-				puts("ACK ");
-			}
-		}
-
-		// We should have hit the STOP bit...
-		if (buf_bits[i] != STOP_BIT) {
-			puts("No stop bit? ");
-		} else {
-			puts("STOP ");
-		}
-		i++;
-		size--;
-		puts("\n");
-	}
 }
 /**
  *  Button handler (KEY button is IRQ-15)
