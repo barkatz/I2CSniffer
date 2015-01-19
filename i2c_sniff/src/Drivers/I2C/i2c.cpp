@@ -37,8 +37,7 @@ I2CSniffer::I2CSniffer(uint32_t SDA_Port, uint32_t SDA_Pin,	uint32_t SCL_Port, u
 					GPIO_OType_OD,
 					GPIO_PuPd_NOPULL,
 					GPIO_PuPd_NOPULL),
-					m_flipNextOneBit(false),
-					m_isWritingByte(false) {
+					m_flipNextOneBit(false) {
 	init();
 }
 
@@ -66,7 +65,7 @@ bool I2CSniffer::Update() {
 	// Or when transmitting a byte on the I2C when we act as the slave
 	if (m_flipNextOneBit) {
 		m_currSdaVal = 1; 											// In this case the original bit is one, and we are flipping it to zero
-	} else if (m_isWritingByte) {
+	} else if (m_writingByteBitIndex) {
 		m_currSdaVal = (m_writingByte >> m_writingByteBitIndex)&1; // In this case the sda value is the current bit we transmitting
 	} else {
 		m_currSdaVal = m_sdaPort.read();							// In this case we are reading the bit ^^
@@ -145,7 +144,6 @@ void I2CSniffer::flip_next_one_bit() {
 
 
 void I2CSniffer::writeByte(uint8_t byte) {
-	m_isWritingByte = true;
 	m_writingByteBitIndex = 7;
 	m_writingByte = byte;
 	// Prepare the first bit

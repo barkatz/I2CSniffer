@@ -185,9 +185,12 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 			break;
 
 		case I2C_START_BIT:
+			// Advance the count for address bits - 9 bits (8 for address, 1 for ack)
+			address_bit_count = (uint8_t) (address_bit_count + 1) % 9;
+
 			// Read the next bit in the address byte
 			if (!read_byte(address, is_slave_acked, last_bit)) {
-				address_bit_count++;
+
 				// Gather enough bits to check address prefix
 				if (address_bit_count == address_mask_len) {
 					// Check if we have a match
@@ -207,23 +210,24 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 				if ((address_bit_count == 8) && intercepted) {
 					i2c.flip_next_one_bit();
 				}
-				break;
+				break; // Wait on till address is read fully.
 			}
-			// We received 8 bits (+1 for ack), The last bit from address is read(1)/write(0) operation
+			// We received 8 bits (and a +1 for ack), The last bit from address is read(1)/write(0) operation
 			is_write = !(address & 0x1);
 			// If we intercepted, and this is a read operation, the i2c module should act like a slave.
-			if (!is_write) {
+			if (!is_write && intercepted) {
 				i2c.writeByte(0xbb);
+				is_slave_acked = true; // We are acking it :)
 			}
 
-			if (is_slave_acked) {
+			if (is_slave_acked || intercepted) {
 				// If the slave has acked -> move on to the next state.
+				// Also if we intercepted, we acked it, so move on to the next state.
 				i2c_state = I2C_ADDRESS;
 			} else {
 				// If the slave didn't ack -> retry (TODO:?)
 				// Retry? Go to previous stage? note that going back will flush both read/write vector.
 				// Not sure...
-				address_bit_count = 0;
 				address = 0;
 			}
 			break;

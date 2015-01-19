@@ -63,7 +63,6 @@ protected:
 	uint32_t m_oldSdaVal;
 	uint32_t m_oldSclVal;
 	bool 	m_flipNextOneBit;
-	bool 	m_isWritingByte;
 	uint8_t m_writingByteBitIndex;
 	uint8_t m_writingByte;
 };
