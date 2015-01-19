@@ -37,7 +37,16 @@ public:
 	 * When the next bits ONE is transmitted on the line -> pull it to zero.
 	 */
 	void flip_next_one_bit();
+
+	/*
+	 *
+	 */
 	void init();
+
+	/*
+	 * Write a byte to i2c when intercepting.
+	 */
+	void writeByte(uint8_t byte);
 	/**
 	 * Samples the SDA/SCL lines and update the buffer with new bits
 	 * returns true if a new bit was captured.
@@ -53,6 +62,10 @@ protected:
 	uint32_t m_currSclVal;
 	uint32_t m_oldSdaVal;
 	uint32_t m_oldSclVal;
+	bool 	m_flipNextOneBit;
+	bool 	m_isWritingByte;
+	uint8_t m_writingByteBitIndex;
+	uint8_t m_writingByte;
 };
 
 

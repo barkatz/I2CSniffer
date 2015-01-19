@@ -105,10 +105,12 @@ InOutPort::InOutPort(uint32_t GPIO_Port,
 
 
 void InOutPort::write(uint8_t val) {
+	m_inPort.disable();
 	m_outPort.write(val);
 }
 
 uint8_t InOutPort::read() {
+	m_outPort.disable();
 	return m_inPort.read();
 }
 

@@ -9,7 +9,7 @@
 #include "stm32f2xx_rcc.h"
 #include "Drivers\i2c\i2c.h"
 #include <string.h>
-
+#include <stdio.h>
 /*
  *  Ctor:
  *  1) Creates the 2 input ports for sda/scl.
@@ -36,7 +36,9 @@ I2CSniffer::I2CSniffer(uint32_t SDA_Port, uint32_t SDA_Pin,	uint32_t SCL_Port, u
 					GPIO_Speed_50MHz,
 					GPIO_OType_OD,
 					GPIO_PuPd_NOPULL,
-					GPIO_PuPd_NOPULL) {
+					GPIO_PuPd_NOPULL),
+					m_flipNextOneBit(false),
+					m_isWritingByte(false) {
 	init();
 }
 
@@ -53,12 +55,24 @@ bool I2CSniffer::Update() {
 	static bool rise_detected = false;
 	static size_t bit_count = 0;
 
-	// Save old values
+
+	// Save old values of sda/scl
 	m_oldSdaVal = m_currSdaVal;
 	m_oldSclVal = m_currSclVal;
 
 	// Read current line values
-	m_currSdaVal = m_sdaPort.read();
+	// Before pooling the lines, don't poll sda line if we are in the middle of writing 0 on it...
+	// This can happen if we are flipping the next ONE_BIT to zero when intercepting address bit and ACK,
+	// Or when transmitting a byte on the I2C when we act as the slave
+	if (m_flipNextOneBit) {
+		m_currSdaVal = 1; 											// In this case the original bit is one, and we are flipping it to zero
+	} else if (m_isWritingByte) {
+		m_currSdaVal = (m_writingByte >> m_writingByteBitIndex)&1; // In this case the sda value is the current bit we transmitting
+	} else {
+		m_currSdaVal = m_sdaPort.read();							// In this case we are reading the bit ^^
+	}
+
+	// The clock is always being read since the master controls it.
 	m_currSclVal = m_sclPort.read();
 
 	/*
@@ -106,6 +120,17 @@ bool I2CSniffer::Update() {
 			retval = true;
 			m_buffer.push(bit);
 			rise_detected = false;
+			// If we were flipping a bit - Stop
+			if (m_flipNextOneBit) {
+				m_flipNextOneBit = false;
+			}
+
+			// If we are writing the bytes, prepare SDA with the next byte.
+			if (m_writingByteBitIndex) {
+				// First advance to the next bit
+				m_writingByteBitIndex--;
+				m_sdaPort.write((m_writingByte >> m_writingByteBitIndex)&1); // We loaded sda val with the bit to transmit
+			}
 		}
 		return retval;
 	}
@@ -113,5 +138,17 @@ bool I2CSniffer::Update() {
 	return false;
 }
 
+void I2CSniffer::flip_next_one_bit() {
+	m_flipNextOneBit = true;
+	m_sdaPort.write(0);
+}
 
 
+void I2CSniffer::writeByte(uint8_t byte) {
+	m_isWritingByte = true;
+	m_writingByteBitIndex = 7;
+	m_writingByte = byte;
+	// Prepare the first bit
+	m_sdaPort.write((byte >> 7) & 0x1);
+	//m_sda
+}

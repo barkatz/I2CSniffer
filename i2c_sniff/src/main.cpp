@@ -52,12 +52,14 @@ enum I2C_STATE{
  *  Globals
  *********************************************************************************************************/
 // Global i2c sniffer.
-/*
- * Init sda and scl ports as inputs.
- * Those has been chosen with carfull care since some ports are pulling the line to 0.
- * Yes. Even when configured asd NO PULL, the lines where held down low.
+/*--------------------
+ * IMPORTANT NOTE
+ * --------------------
+ * This inits sda and scl ports as inputs.
+ * Those has been chosen with extreme care since some ports are pulling the line to 0.
+ * Yes. Even when configured as NO PULL, the lines where held down low.
  * I wrote down all the ports i have tried just for documentation, maybe i can figure out later on what
- * happend on those ports...
+ * happened on those ports...
  * // Port PA.2 (CN1/37) - SCL (BLUE) 							<---- THIS WORKS
  * // Port PA.3 (CN2/3) - SDA (YELLOW) Pull to 0...
  * // Port PA.13 (CN3/8) - SDA (YELLOW) --> SWDIO no good don't use it (JTAG)
@@ -66,8 +68,21 @@ enum I2C_STATE{
  * // Port PC.0 (CN1/29) - SDA (a-0,b-1,c-2,d-3,e-4,f-5) --> < ----- THIS WORKS
  */
 I2CSniffer i2c(SDA_PORT, SDA_PIN, SCL_PORT, SCL_PIN, 0x1000);
-// The bits captured from the i2c sniffer.
+// A buffer to hold the bits captured from the i2c sniffer for actual prodcessing
 BITS unprocessed_bits[0x1000];
+
+/*
+ * The address mask of the slave we are targeting.
+ * This mask will be 'anded' with the current address of the slave and check if it matches the target.
+ * If they match we will flip the next '1' bit.
+ * NOTE - it is important to have at least a single '1' bit aftrer the mask
+ * for example we want to intercept 0x90 = 0b10010000, and our mask would be 0x80=0b10000000
+ *  So we could flip the second '1' bit.
+ */
+uint8_t address_mask = 0xE0;
+uint8_t address_mask_len = 3;
+uint8_t address_target = (0x90 & address_mask);
+uint8_t data_to_write  = 0xbb;
 
 /********************************************************************************************************
  *  Decl
@@ -129,7 +144,8 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 	static I2C_STATE i2c_state = I2C_NOT_SYNCED;
 
 	// The address in the current transaction
-	static uint8_t address			= 0;
+	static uint8_t address				= 0;
+	static uint8_t address_bit_count 	= 0;
 
 	// The read/write of the current transaction
 	static bool is_write 			= 0;
@@ -137,10 +153,10 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 	// Did a slave acked for the transaction?
 	static bool is_slave_acked		= 0;
 
-
-
 	// A temp buffer of the currently written byte.
 	static uint8_t temp_byte = 0;
+
+	static bool intercepted = false;
 	//static std::vector<char> bytes_written;
 	//static std::vector<char> bytes_read;
 
@@ -163,17 +179,42 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 
 				// Yes. lets move on and wait for the address to be transmitted.
 				i2c_state 	= I2C_START_BIT;
+				address_bit_count = 0;
 			}
 
 			break;
 
 		case I2C_START_BIT:
-			// Read the address byte
+			// Read the next bit in the address byte
 			if (!read_byte(address, is_slave_acked, last_bit)) {
+				address_bit_count++;
+				// Gather enough bits to check address prefix
+				if (address_bit_count == address_mask_len) {
+					// Check if we have a match
+					if 	((address & address_mask) == address_target) {
+						// Yes. it matches, we need to flip the next ONE_BIT in the address currently being transmitted.
+						i2c.flip_next_one_bit();
+						// Also flag that the i2c should be the slave.
+						intercepted = true;
+						// TODO:We also need to remember to answer with ACK after all bytes finished.
+					} else {
+						// No. Let the request pass, don't intercept anything.
+						intercepted = false;
+					}
+				}
+
+				// If we intercepted the address, we need to ack after 8 bits of address.
+				if ((address_bit_count == 8) && intercepted) {
+					i2c.flip_next_one_bit();
+				}
 				break;
 			}
-			// The last bit from address is read(1)/write(0) operation
+			// We received 8 bits (+1 for ack), The last bit from address is read(1)/write(0) operation
 			is_write = !(address & 0x1);
+			// If we intercepted, and this is a read operation, the i2c module should act like a slave.
+			if (!is_write) {
+				i2c.writeByte(0xbb);
+			}
 
 			if (is_slave_acked) {
 				// If the slave has acked -> move on to the next state.
@@ -182,6 +223,8 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 				// If the slave didn't ack -> retry (TODO:?)
 				// Retry? Go to previous stage? note that going back will flush both read/write vector.
 				// Not sure...
+				address_bit_count = 0;
+				address = 0;
 			}
 			break;
 
@@ -196,7 +239,7 @@ bool examine_bits(BITS* bits_arr, size_t bits_size) {
 				hit_stop_bit = true;
 				i2c_state = I2C_NOT_SYNCED;
 			} else {
-				// Read a byte from the lines...
+				// Read the next bit and pack it into the byte
 				if (!read_byte(temp_byte, temp_ack, last_bit)) {
 					break;
 				}
