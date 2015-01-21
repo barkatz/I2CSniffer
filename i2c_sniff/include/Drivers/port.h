@@ -28,14 +28,7 @@ public:
 	 */
 	Port(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
 			GPIOMode_TypeDef GPIO_Mode, GPIOOType_TypeDef GPIO_OType,
-			GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled) :
-			m_GPIO_Port(GPIO_Port),
-			m_GPIO_Pin(GPIO_Pin),
-			m_GPIO_Speed(GPIO_Speed),
-			m_GPIO_Mode(GPIO_Mode),
-			m_GPIO_OType(GPIO_OType),
-			m_GPIO_PuPd(GPIO_PuPd),
-			m_isEnabled(isEnabled) {}
+			GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled);
 
 	/**
 	 * enables the port with the current configuration.
@@ -56,11 +49,7 @@ protected:
 	// All of the ports charastristics.
 	uint32_t 				m_GPIO_Port; 		// GPIO Port 0->A, 1->B, 2-->C ....
 	uint32_t 				m_GPIO_Pin; 		// The pin 1,2,3...
-	GPIOSpeed_TypeDef 		m_GPIO_Speed; 		// The speed of the port relevant only for Outputs (2MHZ/10MHZ/50MHZ...)
-	GPIOMode_TypeDef 		m_GPIO_Mode; 		// The mode (in/out)
-	GPIOOType_TypeDef 		m_GPIO_OType; 		// Type of output pushpull/opendrain (This is for output only)
-	GPIOPuPd_TypeDef 		m_GPIO_PuPd; 		// type of pull (up/down/none)
-
+	GPIO_InitTypeDef 		m_GPIO_InitStructure;
 	bool 					m_isEnabled;		// Whether the port is currently disabled (need to call init to enable)
 };
 

@@ -10,20 +10,28 @@
 /**************************************************
  * Generic port
  **************************************************/
+
+Port::Port(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
+		GPIOMode_TypeDef GPIO_Mode, GPIOOType_TypeDef GPIO_OType,
+		GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled) :
+		m_GPIO_Port(GPIO_Port),
+		m_GPIO_Pin(GPIO_Pin),
+		m_isEnabled(isEnabled) {
+	// Turn on the clock for the port
+	RCC_AHB1PeriphClockCmd(PORT_RCC_MASKx(m_GPIO_Port), ENABLE);
+
+	// Configure pin in output push/pull mode
+	m_GPIO_InitStructure.GPIO_Pin 			= PORT_PIN_MASK(m_GPIO_Pin);
+	m_GPIO_InitStructure.GPIO_Speed 		= GPIO_Speed;
+	m_GPIO_InitStructure.GPIO_Mode 			= GPIO_Mode;
+	m_GPIO_InitStructure.GPIO_OType 		= GPIO_OType;
+	m_GPIO_InitStructure.GPIO_PuPd 			= GPIO_PuPd;
+
+}
 void Port::enable() {
 	// Enable GPIO Peripheral clock
-	  RCC_AHB1PeriphClockCmd(PORT_RCC_MASKx(m_GPIO_Port), ENABLE);
-
-	  GPIO_InitTypeDef GPIO_InitStructure;
-
-	  // Configure pin in output push/pull mode
-	  GPIO_InitStructure.GPIO_Pin = PORT_PIN_MASK(m_GPIO_Pin);
-	  GPIO_InitStructure.GPIO_Speed = m_GPIO_Speed;
-	  GPIO_InitStructure.GPIO_Mode = m_GPIO_Mode;
-	  GPIO_InitStructure.GPIO_OType = m_GPIO_OType;
-	  GPIO_InitStructure.GPIO_PuPd = m_GPIO_PuPd;
-	  GPIO_Init(PORT_GPIOx(m_GPIO_Port), &GPIO_InitStructure);
-	  m_isEnabled = true;
+	GPIO_Init(PORT_GPIOx(m_GPIO_Port), &m_GPIO_InitStructure);
+	m_isEnabled = true;
 }
 
 void Port::disable() {
