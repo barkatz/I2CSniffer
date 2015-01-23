@@ -35,6 +35,5 @@ system/src/cmsis \
 src \
 src/Drivers \
 src/Drivers/LCD \
-src/Drivers/I2C \
 src/Drivers/Ether \
 

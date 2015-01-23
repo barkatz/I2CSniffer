@@ -34,9 +34,7 @@ src/main.o: ../src/main.cpp ../include/Timer.h \
  ../include/lcd_log.h ../include/lcd_log_conf.h \
  ../include/stm322xg_eval_lcd.h ../include/stm322xg_eval.h \
  ../include/stm32_eval_legacy.h ../include/fonts.h \
- ../include/Drivers\port.h ../include/Drivers\i2c\i2c.h \
- ../include/Drivers\i2c\../port.h \
- ../include/Drivers\i2c\../../CyclicBuffer.h
+ ../include/Drivers\port.h
 
 ../include/Timer.h:
 
@@ -123,9 +121,3 @@ src/main.o: ../src/main.cpp ../include/Timer.h \
 ../include/fonts.h:
 
 ../include/Drivers\port.h:
-
-../include/Drivers\i2c\i2c.h:
-
-../include/Drivers\i2c\../port.h:
-
-../include/Drivers\i2c\../../CyclicBuffer.h:

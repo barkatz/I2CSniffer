@@ -15,6 +15,10 @@
 #define PORT_GPIOx(_N)                	 ((GPIO_TypeDef *)(GPIOA_BASE + (GPIOB_BASE-GPIOA_BASE)*(_N)))
 
 /*
+ *  The port classes are inline for speed issues!
+ */
+
+/*
  * A generic GPIO
  */
 class Port {
@@ -28,29 +32,38 @@ public:
 	 */
 	Port(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
 			GPIOMode_TypeDef GPIO_Mode, GPIOOType_TypeDef GPIO_OType,
-			GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled);
+			GPIOPuPd_TypeDef GPIO_PuPd) :	m_GPIO_Port(GPIO_Port), 	m_GPIO_Pin(GPIO_Pin) {
+		// Turn on the clock for the port
+		RCC_AHB1PeriphClockCmd(PORT_RCC_MASKx(m_GPIO_Port), ENABLE);
 
-	/**
-	 * enables the port with the current configuration.
-	 */
-	void enable();
+		// Configure pin in output push/pull mode
+		m_GPIO_InitStructure.GPIO_Pin 			= PORT_PIN_MASK(m_GPIO_Pin);
+		m_GPIO_InitStructure.GPIO_Speed 		= GPIO_Speed;
+		m_GPIO_InitStructure.GPIO_Mode 			= GPIO_Mode;
+		m_GPIO_InitStructure.GPIO_OType 		= GPIO_OType;
+		m_GPIO_InitStructure.GPIO_PuPd 			= GPIO_PuPd;
+		GPIO_Init(PORT_GPIOx(m_GPIO_Port), &m_GPIO_InitStructure);
+	}
 
 	/**
 	 * Sets the port in a disabled state. This can be usefull when a port has
 	 * 2 configurations (input/output) and used in InOutPort.
 	 */
-	void disable();
+
+	inline uint32_t getPort() {
+		return m_GPIO_Port;
+	}
+
+	inline uint32_t getPin() {
+		return m_GPIO_Pin;
+	}
 
 
-	bool getEnabled();
-	uint32_t getPort();
-	uint32_t getPin();
 protected:
 	// All of the ports charastristics.
-	uint32_t 				m_GPIO_Port; 		// GPIO Port 0->A, 1->B, 2-->C ....
-	uint32_t 				m_GPIO_Pin; 		// The pin 1,2,3...
-	GPIO_InitTypeDef 		m_GPIO_InitStructure;
-	bool 					m_isEnabled;		// Whether the port is currently disabled (need to call init to enable)
+	uint32_t 				m_GPIO_Port; 			// GPIO Port 0->A, 1->B, 2-->C ....
+	uint32_t 				m_GPIO_Pin; 			// The pin 1,2,3...
+	GPIO_InitTypeDef 		m_GPIO_InitStructure; 	// Port charastristics
 };
 
 /**
@@ -66,16 +79,19 @@ public:
 	 * @GPIO_PuPd   -
 	 */
 	InPort(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
-			GPIOOType_TypeDef GPIO_OType, GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled);
+			GPIOOType_TypeDef GPIO_OType, GPIOPuPd_TypeDef GPIO_PuPd):
+			Port(GPIO_Port, GPIO_Pin, GPIO_Speed, GPIO_Mode_IN, GPIO_OType, GPIO_PuPd) {}
 
-	uint8_t read(void);
-
+	inline uint8_t read(void) {
+		// If this port is enabled simply read a bit.
+		return GPIO_ReadInputDataBit(PORT_GPIOx(m_GPIO_Port), (uint16_t) PORT_PIN_MASK(m_GPIO_Pin));
+	}
 };
 
 /**
  * An output port.
  */
-class OutPort: public Port{
+class OutPort: public Port {
 public:
 	/*
 	 * @GPIO_Port 	- Choose the port for the GPIO: 0->A, 1->B, 2->C...
@@ -85,46 +101,15 @@ public:
 	 * @GPIO_PuPd   -
 	 */
 	OutPort(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
-			GPIOOType_TypeDef GPIO_OType, GPIOPuPd_TypeDef GPIO_PuPd, bool isEnabled);
+			GPIOOType_TypeDef GPIO_OType, GPIOPuPd_TypeDef GPIO_PuPd) :
+				Port(GPIO_Port, GPIO_Pin, GPIO_Speed, GPIO_Mode_OUT, GPIO_OType,GPIO_PuPd) {}
 
-	void write(uint8_t val);
+	inline void write(uint8_t val) {
+		// Simply write a bit
+		GPIO_WriteBit(PORT_GPIOx(m_GPIO_Port), (uint16_t) PORT_PIN_MASK(m_GPIO_Pin), val? Bit_SET: Bit_RESET);
+	}
 };
 
-/*
- * A port that can be either written to and read from
- */
-class InOutPort {
-public:
-	/*
-	 * @GPIO_Port 	- Choose the port for the GPIO: 0->A, 1->B, 2->C...
-	 * @GPIO Pin 	- Choose the pin 1,2,3...
-	 * @GPIO_OutSpeed 	- Speed for output port
-	 * 					  There's no need for speed for input port
-	 * @GPIO_OutOType   - Push/Pull or open drain.
-	 * 					 Ther'es no need for OutType for input port
 
-	 * @GPIO_OutPuPd    -  pull for output port
-	 * @GPIO_InPuPd     -  pull for input port
-	 */
-	InOutPort(uint32_t GPIO_Port,
-			uint32_t GPIO_Pin,
-			GPIOSpeed_TypeDef GPIO_OutSpeed,
-			GPIOOType_TypeDef GPIO_OutOType,
-			GPIOPuPd_TypeDef GPIO_OutPuPd,
-			GPIOPuPd_TypeDef GPIO_InPuPd);
+#endif /* DRIVERS_PORT_H_*/
 
-
-	void write(uint8_t val);
-	uint8_t read(void);
-
-protected:
-	enum STATE {
-		READ,
-		WRITE
-	};
-
-	InPort		m_inPort;
-	OutPort 	m_outPort;
-	STATE 		m_state;
-};
-#endif /* DRIVERS_PORT_H_ */
