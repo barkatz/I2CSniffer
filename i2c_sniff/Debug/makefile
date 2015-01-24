@@ -14,7 +14,6 @@ RM := rm -rf
 -include system/src/cortexm/subdir.mk
 -include system/src/cmsis/subdir.mk
 -include src/Drivers/LCD/subdir.mk
--include src/Drivers/Ether/subdir.mk
 -include src/Drivers/subdir.mk
 -include src/subdir.mk
 -include subdir.mk

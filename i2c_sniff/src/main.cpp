@@ -3,12 +3,12 @@
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
-#include "Timer.h"
+#include "stm32f2xx.h"
+#include "stm32f2xx_rtc.h"
 #include "BlinkLed.h"
 #include "lcd_log.h"
 #include "Drivers\port.h"
-
-#include "stm32f2xx.h"
+#include "CyclicBuffer.h"
 
 //#include "stm32fxx_exti.h"
 
@@ -63,7 +63,6 @@
 #define SCL_PORT_IN		0
 #define SCL_PIN_IN		2
 
-
 // I2C PINS
 // I2C1_SCL --> PB.6 (CN4/13)
 // I2C1_SDA --> PB.9 (CN4/8)
@@ -72,36 +71,30 @@
  * Enums & Defines
  ***************************************************/
 enum BITS {
-	ZERO_BIT = 0,
-	ONE_BIT = 1,
-	START_BIT = 2,
-	STOP_BIT = 3,
+	ZERO_BIT = 0, ONE_BIT = 1, START_BIT = 2, STOP_BIT = 3,
 };
 /********************************************************************************************************
  *  Globals
  *********************************************************************************************************/
 
+InPort sdaPortIn(SDA_PORT_IN, SDA_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
+		GPIO_PuPd_NOPULL);
 
-InPort		sdaPortIn(SDA_PORT_IN,	SDA_PIN_IN,
-				GPIO_Speed_50MHz,
-				GPIO_OType_OD,
-				GPIO_PuPd_NOPULL);
+OutPort sdaPortOut(SDA_PORT_OUT, SDA_PIN_OUT, GPIO_Speed_50MHz, GPIO_OType_OD,
+		GPIO_PuPd_UP);
 
-OutPort		sdaPortOut(SDA_PORT_OUT,	SDA_PIN_OUT,
-				GPIO_Speed_50MHz,
-				GPIO_OType_OD,
-				GPIO_PuPd_UP);
+InPort sclPortIn(SCL_PORT_IN, SCL_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
+		GPIO_PuPd_NOPULL);
 
-
-InPort		sclPortIn(SCL_PORT_IN,	SCL_PIN_IN,
-				GPIO_Speed_50MHz,
-				GPIO_OType_OD,
-				GPIO_PuPd_NOPULL);
-
+struct lines_samples_t {
+	bool sda;
+	bool scl;
+};
+uint32_t bla[0x100] = {0};
+uint32_t bla2 = 0;
 // A buffer to hold the bits captured from the i2c sniffer for actual processing
 #define UNPROCCESED_BITS_SIZE 0x1000
-static size_t bits_index = 0;
-static BITS unprocessed_bits[UNPROCCESED_BITS_SIZE];
+static CyclicBuffer<BITS> unprocessed_bits(UNPROCCESED_BITS_SIZE);
 
 /* This boolean flag used to flag scl_rise event.
  * We sample SDA when SCL falls, and treat it as a data bit.
@@ -121,26 +114,23 @@ uint8_t address_mask_len = 3;
 uint8_t address_target = (0x90 & address_mask);
 
 // The prefix of the address to intercept - Always starts with a start bit
-BITS 		address_to_intercept[] 	= { START_BIT, ONE_BIT, ZERO_BIT, ZERO_BIT };
+BITS address_to_intercept[] = { START_BIT, ONE_BIT, ZERO_BIT, ZERO_BIT };
 // How many bits already matched.
-uint8_t 	match_index 			= 0;
+uint8_t match_index = 0;
 // A flag to signal interception is in progress in the current transaction
-bool 		is_intercepting 		= false;
+bool is_intercepting = false;
 // A flag to indicate that an address bit is being flipped.
-bool 		is_flip					= false;
+bool is_flip = false;
 
 /********************************************************************************************************
  *  Decl
  *********************************************************************************************************/
-void		print_i2c_buffer(BITS* buf_bits, size_t size);
-void 		print_hex(unsigned int a);
-void 		init_gpio_interrupts();
-void 		init_buttons();
-uint8_t 	pack_byte(BITS* bits);
-void 		init_i2c();
-
-
-
+size_t print_i2c_buffer(BITS* buf_bits, size_t size);
+void print_i2c_buffer(CyclicBuffer<BITS>& buf_bits);
+void print_hex(unsigned int a);
+void init_buttons();
+uint8_t pack_byte(BITS* bits);
+void init_i2c();
 
 /*********************************************************************************************************
  *  Impl
@@ -158,69 +148,9 @@ void init_lcd(void) {
 	LCD_LOG_SetHeader((uint8_t*) "I2C Sniffer");
 }
 
-void 		init_i2c() {
+void init_i2c() {
 
 }
-void init_gpio_interrupts() {
-	// TODO: Refactor this into a function and call it on both ports.
-	// Makes PA.2, and PC.0 FLOATING INPUTS, with interrupts to capture fall/rise.
-	EXTI_InitTypeDef EXTI_InitStructure;
-	GPIO_InitTypeDef GPIO_InitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
-
-	/* Enable GPIOA/GPIOAC clock -> Already done in ports...*/
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	/* Enable SYSCFG clock */
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-	/* Configure PA.2 pin as input floating -> Already done in ports...*/
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
-//	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-//	/* Configure PC.0 pin as input floating -> Already done in ports...*/
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-//	GPIO_Init(GPIOC, &GPIO_InitStructure);
-
-	/* Connect EXTI Line0 to PA pin */
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource2);
-//	  /* Connect EXTI Line1 to PC pin */
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource0);
-
-	/* Configure EXTI Line2, to capture Rising/Falling. */
-	EXTI_InitStructure.EXTI_Line = EXTI_Line2;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-
-//	  /* Configure EXTI Line0, to capture Rising/Falling. */
-	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-
-	/* Enable and set EXTI Line2 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-
-//	  /* Enable and set EXTI Line0 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-}
-
-
 
 void init_buttons() {
 	// Init the button interrupt
@@ -239,15 +169,16 @@ uint8_t pack_byte(BITS* bits) {
 /*
  * Prints the bytes from I2C buffer
  */
-void print_i2c_buffer(BITS* buf_bits, size_t size) {
+
+size_t print_i2c_buffer(BITS* buf_bits, size_t size) {
 	uint8_t temp_byte;
 	bool acked;
-
+	size_t i = 0;
 	if (!size) {
-		return;
+		return 0;
 	}
 
-	for (size_t i = 0; i < size;) {
+	for (i = 0; i < size;) {
 		// In this case we are waiting for start bit. is the last bit captured a start bit?
 		if (buf_bits[i] == START_BIT) {
 			puts("[");
@@ -270,163 +201,207 @@ void print_i2c_buffer(BITS* buf_bits, size_t size) {
 		}
 	}
 	puts("\n");
+	return i;
 }
-/**
- * Interrupts must be as extern!
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
- *  Button handler (KEY button is IRQ-15)
- *  This prints the buffer of the sniffed I2C msgs to the screen.
+ * Prints the bytes from I2C buffer
  */
-void EXTI15_10_IRQHandler(void) {
-	EXTI_ClearFlag(EXTI_Line15);
-	init_lcd();
-}
-
-//int count1 = 0;
-//int count2 = 0;
-//int count3 = 0;
-//int count4 = 0;
-int sda_rise_count = 0;
-int sda_fall_count = 0;
-
-int scl_rise_count = 0;
-int scl_fall_count = 0;
-
-int false_sda_rise_count = 0;
-int false_sda_fall_count = 0;
-/**
- * SDA Interrupt (PC0)
- */
-void EXTI0_IRQHandler(void) {
-	if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
-		/* Clear the EXTI line 0 pending bit */
-		EXTI_ClearITPendingBit(EXTI_Line0);
-
-		// Get value of sda/scl
-		bool sda = sdaPortIn.read();
-		bool scl = sclPortIn.read();
-
-		if (sda) {
-			sda_rise_count++;
-		} else {
-			sda_fall_count++;
-		}
-
-		// if sda is now 1 -> SDA rise.
-		// If scl is high, and SDA made transition to 1 -> STOP BIT
-		if (sda && scl) {
-			// Push the stop bit to the bits array
-			unprocessed_bits[bits_index] = STOP_BIT;
-			bits_index = (bits_index + 1) % UNPROCCESED_BITS_SIZE;
-
-			// Since this is the end of the transaction, reset the matching index.
-			match_index = 0;
-			// Again - this is the transaction end -> We are no longer intercepting.
-			is_intercepting = false;
-
-			// Don't confuse it with a data bit! scl was floating high not as a part of a bit pulse.
-			scl_rise = false;
-
-			// Print the last transaction
-			print_i2c_buffer(unprocessed_bits, bits_index);
-			// And reset buffer.
-			bits_index = 0;
-		} else if (!sda && scl) {
-			// sda is now 0 -> SDA Falls.
-			// If scl is high, and SDA made a transition to 0 -> START BIT
-			assert(bits_index == 0);
-			unprocessed_bits[bits_index] = START_BIT;
-			bits_index = (bits_index + 1) % UNPROCCESED_BITS_SIZE;
-			// If we were intercepting the last transaction - we no longer are.
-			is_intercepting = false;
-			// Address always start at a start bit
-			match_index++;
-			// Don't confuse it with a data bit!
-			scl_rise = false;
-		} else if (sda) {
-			false_sda_rise_count++;
-		} else {
-			false_sda_fall_count++;
-		}
+void print_i2c_buffer(CyclicBuffer<BITS>& buf) {
+	BITS temp;
+	size_t processed_bits = print_i2c_buffer(buf.get_buffer(), buf.get_size());
+	assert(processed_bits < buf.get_size());
+	for (size_t i = 0; i < processed_bits; i++) {
+		buf.pop(temp);
 	}
 }
 
-/*
- * SCL Interrupt (PA2)
- */
-void EXTI2_IRQHandler(void) {
-	static bool temp_bit = 0;
-	if (EXTI_GetITStatus(EXTI_Line2) != RESET) {
-		/* Clear the EXTI line 2 pending bit */
-		EXTI_ClearITPendingBit(EXTI_Line2);
-		// Get value of sda/scl
-		bool sda = sdaPortIn.read();
-		bool scl = sclPortIn.read();
-		if (scl) {
-			scl_rise_count++;
-		} else {
-			scl_fall_count++;
-		}
+void process_lines() {
+	lines_samples_t prev_sample = { (bool) sdaPortIn.read(),
+			(bool) sclPortIn.read() };
+	lines_samples_t curr_sample = { (bool) sdaPortIn.read(),
+			(bool) sclPortIn.read() };
+	BITS temp_bit = ZERO_BIT;
+	uint32_t bitcount = 0;
+	uint32_t max_time = 0;
+	uint32_t state_time = 0;
+	volatile uint32_t start_time, end_time;
 
-		// if scl is now 1 -> scl rise -> Some one xmiting a bit
-		// Save the bit value, and wait for scl fall to add it
-		if (scl) {
-			temp_bit = sda;
+
+	while (1) {
+		start_time = (volatile int) RTC->TR;
+		curr_sample.sda = (bool) sdaPortIn.read();
+		curr_sample.scl = (bool) sclPortIn.read();
+		if ((curr_sample.sda == prev_sample.sda)
+				&& (curr_sample.scl == prev_sample.scl)) {
+			//state_time++;
+			bla[bla2]++;
+			continue;
+		}
+		bla2++;
+		if (bla2 > 30) {
+			for (size_t i=0; i<bla2; i++) {
+				print_hex(bla[i]);
+			}
+			puts("\n");
+		}
+		goto loop_end;
+
+
+		if (state_time > 0) {
+			unprocessed_bits.push((BITS) temp_bit);
+		}
+		if (temp_bit == START_BIT) {
+			puts("!");
+			print_hex(state_time);
+			puts("!\n");
+		}
+		// State has changed
+		state_time = 0;
+		if (prev_sample.sda && !curr_sample.sda) {
+			/*
+			 * SDA fall
+			 */
+			if (prev_sample.scl && curr_sample.scl) {
+				/*
+				 *  SDA fall, and high scl --> START BIT
+				 */
+				temp_bit = START_BIT;
+
+				// If we were intercepting the last transaction - we no longer are.
+				is_intercepting = false;
+				// Address always start at a start bit
+				match_index++;
+				//	Don't confuse it with a data bit!
+				scl_rise = false;
+			}
+		} else if (!prev_sample.sda && curr_sample.sda) {
+			/*
+			 * SDA raise
+			 */
+			if (prev_sample.scl && curr_sample.scl) {
+				/*
+				 *  SDA raise, and high scl --> STOP BIT
+				 */
+				// Stop bit must come after we finished recieving/xmitting a byte.
+				// Note that we might get to this case by mistake, when sda and scl are changing together.
+				if (bitcount) {
+					goto loop_end;
+				}
+
+				// Push the stop bit to the bits array
+				temp_bit = STOP_BIT;
+				// Since this is the end of the transaction, reset the matching index.
+				match_index = 0;
+				// Again - this is the transaction end -> We are no longer intercepting.
+				is_intercepting = false;
+				// Don't confuse it with a data bit! scl was floating high not as a part of a bit pulse.
+				scl_rise = false;
+				// Print the last transaction
+				print_i2c_buffer(unprocessed_bits);
+			}
+		} else if (!prev_sample.scl && curr_sample.scl) {
+			/*
+			 * SCL raise
+			 */
+			// Sample the bit
+			temp_bit = (BITS) curr_sample.sda;
 			scl_rise = true;
-		} else {
-			// if scl is now 0 -> scl fall.
+		} else if (prev_sample.scl && !curr_sample.scl) {
+			/*
+			 * SCL fall
+			 */
 			// when scl falls the second time, we stop the flipping.
-			if (is_flip) {
-				is_flip = false;
-				sdaPortOut.write(1); // Pulled up.
-			}
-			// if we had a rise before add this bit.
-			// if not its probably a start/stop bit, ignore it.
+			//if (is_flip) {
+			//	is_flip = false;
+			//	sdaPortOut.write(1); // Pulled up.
+			//}
+			//// if we had a rise before add this bit.
+			//// if not its probably a start/stop bit, ignore it.
 			if (scl_rise) {
-				unprocessed_bits[bits_index] = (BITS)temp_bit;
-				bits_index = (bits_index + 1) % UNPROCCESED_BITS_SIZE;
-
-
+				// Push the bit currently transmitted.
+				unprocessed_bits.push((BITS) temp_bit);
+				// Count the bit count in byte (8 bits +1 for ack).
+				// this is needed to avoid detecting false start/stop bits in the middle of a byte transfer
+				// due to accuracy issues (the transmitter might be changing sda together with scl really quickly
+				// And we might consider it a stop/start bit by mistake)
+				bitcount = (bitcount + 1) % 9;
 				// Check if we have a matching bit
-				if (match_index && (address_to_intercept[match_index] == (BITS) temp_bit)) {
-					match_index++;
-				}
+				//if (match_index && (address_to_intercept[match_index] == (BITS) temp_bit)) {
+				//	match_index++;
+				//}
 				// Check if we matched the entire prefix.
-				if (match_index == sizeof(address_to_intercept)) {
-					// Set the intercption flag, and mark that we are flipping a bit.
-					is_intercepting = true;
-					is_flip = true;
-					// Stop matching until next start
-					match_index = 0;
-					// Prepare a 0 on the sda line for next bit
-					sdaPortOut.write(0);
-
-				}
+				//if (match_index == sizeof(address_to_intercept)) {
+				//	// Set the intercption flag, and mark that we are flipping a bit.
+				//	is_intercepting = true;
+				//	is_flip = true;
+				//	// Stop matching until next start
+				//	match_index = 0;
+				//	// Prepare a 0 on the sda line for next bit
+				//	sdaPortOut.write(0);
+				//
+				//}
+				//}
 			}
 			scl_rise = false;
+		} else {
+			// This could happen?
+			assert(0);
 		}
+		loop_end:
+		end_time = (volatile int) RTC->TR;
+		prev_sample = curr_sample;
+		uint32_t diff = (end_time - start_time) % 0xFFFFFFFF;
+		if (diff > max_time) {
+			max_time = diff;
+		}
+		// Each tick is 1MHZ, 3 ticks is already bad.
+		assert(diff < 3);
+
 	}
 }
-#ifdef __cplusplus
+
+ErrorStatus init_rtc() {
+	RTC_InitTypeDef RTC_InitStruct;
+
+	/* Enable the PWR clock */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+
+	/* Allow access to RTC */
+	PWR_BackupAccessCmd(ENABLE);
+
+	/* LSI used as RTC source clock */
+	/* The RTC Clock may varies due to LSI frequency dispersion. */
+	/* Enable the LSI OSC */
+	RCC_LSICmd(ENABLE);
+
+	/* Wait till LSI is ready */
+	while (RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET) {
+	}
+
+	/* Select the RTC Clock Source */
+	RCC_RTCCLKConfig(RCC_RTCCLKSource_LSI);
+
+	/* Enable the RTC Clock */
+	RCC_RTCCLKCmd(ENABLE);
+
+	/* Wait for RTC APB registers synchronisation */
+	RTC_WaitForSynchro();
+	RTC_StructInit(&RTC_InitStruct);
+	RTC_InitStruct.RTC_SynchPrediv = 0;
+	RTC_InitStruct.RTC_AsynchPrediv = 0;
+	return RTC_Init(&RTC_InitStruct);
 }
-#endif
 
 int main(int argc, char* argv[]) {
 	sdaPortOut.write(1);
 	init_lcd();
 	init_buttons();
 	init_i2c();
-	init_gpio_interrupts();
-	sdaPortOut.write(1);
-
-	while (1) {
-
+	if (init_rtc() != SUCCESS) {
+		LCD_BarLog("Failed to init RTC!\n");
 	}
+	sdaPortOut.write(1);
+	process_lines();
 
 }
 

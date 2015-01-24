@@ -8,12 +8,10 @@ C_SRCS += \
 
 CPP_SRCS += \
 ../src/BlinkLed.cpp \
-../src/Timer.cpp \
 ../src/main.cpp 
 
 OBJS += \
 ./src/BlinkLed.o \
-./src/Timer.o \
 ./src/_write.o \
 ./src/main.o 
 
@@ -22,7 +20,6 @@ C_DEPS += \
 
 CPP_DEPS += \
 ./src/BlinkLed.d \
-./src/Timer.d \
 ./src/main.d 
 
 
