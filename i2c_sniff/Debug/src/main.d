@@ -32,7 +32,7 @@ src/main.o: ../src/main.cpp ../include/lcd_log.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_wwdg.h \
  ../system/include/stm32f2-stdperiph/misc.h \
  ../include/stm32_eval_legacy.h ../include/fonts.h \
- ../include/Drivers\port.h ../include/utils.hpp
+ ../include/Drivers\port.h ../src/utils.hpp
 
 ../include/lcd_log.h:
 
@@ -112,4 +112,4 @@ src/main.o: ../src/main.cpp ../include/lcd_log.h \
 
 ../include/Drivers\port.h:
 
-../include/utils.hpp:
+../src/utils.hpp:
