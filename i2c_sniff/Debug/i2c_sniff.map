@@ -412,6 +412,118 @@ Discarded input sections
  .debug_macro   0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_i2c.o
  .debug_macro   0x00000000       0x82 ./system/src/stm32f2-stdperiph/stm32f2xx_i2c.o
  .debug_macro   0x00000000       0x35 ./system/src/stm32f2-stdperiph/stm32f2xx_i2c.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text          0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .data          0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .bss           0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_DeInit
+                0x00000000       0x1c ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_BackupAccessCmd
+                0x00000000       0x20 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_PVDLevelConfig
+                0x00000000       0x2c ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_PVDCmd
+                0x00000000       0x20 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_WakeUpPinCmd
+                0x00000000       0x20 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_BackupRegulatorCmd
+                0x00000000       0x20 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_FlashPowerDownCmd
+                0x00000000       0x20 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_EnterSTOPMode
+                0x00000000       0x74 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_EnterSTANDBYMode
+                0x00000000       0x28 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_GetFlagStatus
+                0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .text.PWR_ClearFlag
+                0x00000000       0x28 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .rodata.str1.4
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_info    0x00000000      0x657 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_abbrev  0x00000000      0x1d4 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_loc     0x00000000      0x1f6 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_aranges
+                0x00000000       0x70 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_ranges  0x00000000       0x60 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x1f8 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x88c ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x50 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x3a ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x22 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x44 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x1c ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x1f7 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x2d ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0xbb1 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000     0x7f9a ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x455 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x3cf ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x111 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x188 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0xb2 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x149 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x477 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0xb4 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x242 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x279 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0xb5 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x25e ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x2b4 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x64 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x575 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x40 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x3f3 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x344 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x358 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0xe1 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x73b ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000      0x223 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x82 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x35 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_macro   0x00000000       0x82 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_line    0x00000000      0x62a ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_str     0x00000000    0x54f7d ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .comment       0x00000000       0x71 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .debug_frame   0x00000000      0x118 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
+ .ARM.attributes
+                0x00000000       0x33 ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
@@ -562,6 +674,180 @@ Discarded input sections
  .debug_macro   0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
  .debug_macro   0x00000000       0x82 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
  .debug_macro   0x00000000       0x35 ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text          0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .data          0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .bss           0x00000000        0x0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_DeInit
+                0x00000000       0xec ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_Init
+                0x00000000       0xc4 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_StructInit
+                0x00000000        0xc ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_WriteProtectionCmd
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_EnterInitMode
+                0x00000000       0x44 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_ExitInitMode
+                0x00000000       0x10 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_WaitForSynchro
+                0x00000000       0x48 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_RefClockCmd
+                0x00000000       0x8c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_SetTime
+                0x00000000      0x260 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TimeStructInit
+                0x00000000        0xc ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetTime
+                0x00000000       0x70 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_SetDate
+                0x00000000      0x228 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_DateStructInit
+                0x00000000       0x10 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetDate
+                0x00000000       0x6c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_SetAlarm
+                0x00000000      0x2d0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_AlarmStructInit
+                0x00000000       0x10 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetAlarm
+                0x00000000       0xc0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_AlarmCmd
+                0x00000000       0x90 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_WakeUpClockConfig
+                0x00000000       0x3c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_SetWakeUpCounter
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetWakeUpCounter
+                0x00000000        0xc ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_WakeUpCmd
+                0x00000000       0x7c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_DayLightSavingConfig
+                0x00000000       0x54 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetStoreOperation
+                0x00000000       0x10 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_OutputConfig
+                0x00000000       0x50 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_CoarseCalibConfig
+                0x00000000       0x8c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_CoarseCalibCmd
+                0x00000000       0x8c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_CalibOutputCmd
+                0x00000000       0x54 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TimeStampCmd
+                0x00000000       0x64 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetTimeStamp
+                0x00000000       0xd0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TamperTriggerConfig
+                0x00000000       0x48 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TamperCmd
+                0x00000000       0x44 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_WriteBackupRegister
+                0x00000000       0x38 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_ReadBackupRegister
+                0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TamperPinSelection
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_TimeStampPinSelection
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_OutputTypeConfig
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_ITConfig
+                0x00000000       0x8c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetFlagStatus
+                0x00000000       0x60 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_ClearFlag
+                0x00000000       0x38 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_GetITStatus
+                0x00000000       0x58 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .text.RTC_ClearITPendingBit
+                0x00000000       0x38 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .rodata.str1.4
+                0x00000000       0x30 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_info    0x00000000     0x214c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_abbrev  0x00000000      0x2b1 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_loc     0x00000000     0x2010 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_aranges
+                0x00000000      0x168 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_ranges  0x00000000      0x5b0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x1d0 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x88c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x50 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x3a ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x22 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x44 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x1c ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x1f7 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x2d ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0xbb1 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000     0x7f9a ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x455 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x3cf ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x111 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x188 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0xb2 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x149 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x477 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0xb4 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x242 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x279 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0xb5 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x25e ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x2b4 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x64 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x88 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x575 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x40 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x344 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x358 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0xe1 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x73b ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x223 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x34 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x82 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000       0x35 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_macro   0x00000000      0x3ed ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_line    0x00000000     0x1006 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_str     0x00000000    0x55496 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .comment       0x00000000       0x71 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .debug_frame   0x00000000      0x480 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
+ .ARM.attributes
+                0x00000000       0x33 ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_syscfg.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_syscfg.o
  .group         0x00000000        0x8 ./system/src/stm32f2-stdperiph/stm32f2xx_syscfg.o
@@ -2365,7 +2651,9 @@ LOAD ./system/src/stm32f2-stdperiph/misc.o
 LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_exti.o
 LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_gpio.o
 LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_i2c.o
+LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_pwr.o
 LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_rcc.o
+LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_rtc.o
 LOAD ./system/src/stm32f2-stdperiph/stm32f2xx_syscfg.o
 LOAD ./system/src/newlib/_cxx.o
 LOAD ./system/src/newlib/_exit.o
