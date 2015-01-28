@@ -1,11 +1,11 @@
-src/main.o: ../src/main.cpp ../include/Timer.h \
- ../system/include/cmsis/cmsis_device.h \
- ../system/include/cmsis/stm32f2xx.h ../system/include/cmsis/core_cm3.h \
+src/main.o: ../src/main.cpp ../include/lcd_log.h \
+ ../include/lcd_log_conf.h ../include/stm322xg_eval_lcd.h \
+ ../include/stm322xg_eval.h ../system/include/cmsis/stm32f2xx.h \
+ ../system/include/cmsis/core_cm3.h \
  ../system/include/cmsis/core_cmInstr.h \
  ../system/include/cmsis/core_cmFunc.h \
  ../system/include/cmsis/system_stm32f2xx.h ../include/stm32f2xx_conf.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_adc.h \
- ../system/include/cmsis/stm32f2xx.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_can.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_crc.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_cryp.h \
@@ -30,15 +30,17 @@ src/main.o: ../src/main.cpp ../include/Timer.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_tim.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_usart.h \
  ../system/include/stm32f2-stdperiph/stm32f2xx_wwdg.h \
- ../system/include/stm32f2-stdperiph/misc.h ../include/BlinkLed.h \
- ../include/lcd_log.h ../include/lcd_log_conf.h \
- ../include/stm322xg_eval_lcd.h ../include/stm322xg_eval.h \
+ ../system/include/stm32f2-stdperiph/misc.h \
  ../include/stm32_eval_legacy.h ../include/fonts.h \
  ../include/Drivers\port.h ../include/utils.hpp
 
-../include/Timer.h:
+../include/lcd_log.h:
 
-../system/include/cmsis/cmsis_device.h:
+../include/lcd_log_conf.h:
+
+../include/stm322xg_eval_lcd.h:
+
+../include/stm322xg_eval.h:
 
 ../system/include/cmsis/stm32f2xx.h:
 
@@ -53,8 +55,6 @@ src/main.o: ../src/main.cpp ../include/Timer.h \
 ../include/stm32f2xx_conf.h:
 
 ../system/include/stm32f2-stdperiph/stm32f2xx_adc.h:
-
-../system/include/cmsis/stm32f2xx.h:
 
 ../system/include/stm32f2-stdperiph/stm32f2xx_can.h:
 
@@ -105,16 +105,6 @@ src/main.o: ../src/main.cpp ../include/Timer.h \
 ../system/include/stm32f2-stdperiph/stm32f2xx_wwdg.h:
 
 ../system/include/stm32f2-stdperiph/misc.h:
-
-../include/BlinkLed.h:
-
-../include/lcd_log.h:
-
-../include/lcd_log_conf.h:
-
-../include/stm322xg_eval_lcd.h:
-
-../include/stm322xg_eval.h:
 
 ../include/stm32_eval_legacy.h:
 

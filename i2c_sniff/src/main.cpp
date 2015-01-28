@@ -3,8 +3,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
-#include "Timer.h"
-#include "BlinkLed.h"
 #include "lcd_log.h"
 #include "Drivers\port.h"
 #include "utils.hpp"
