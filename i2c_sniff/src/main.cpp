@@ -7,7 +7,7 @@
 #include "BlinkLed.h"
 #include "lcd_log.h"
 #include "Drivers\port.h"
-
+#include "utils.hpp"
 #include "stm32f2xx.h"
 
 //#include "stm32fxx_exti.h"
@@ -96,9 +96,7 @@
 /**************************************************
  * Enums & Defines
  ***************************************************/
-enum BITS {
-	ZERO_BIT = 0, ONE_BIT = 1, START_BIT = 2, STOP_BIT = 3,
-};
+
 /********************************************************************************************************
  *  Globals
  *********************************************************************************************************/
@@ -132,20 +130,13 @@ bool wait_for_start_bit = false;
  *  Decl
  *********************************************************************************************************/
 void print_i2c_buffer(BITS* buf_bits, size_t size);
-void print_hex(unsigned int a);
 void init_gpio_interrupts();
 void init_buttons();
-uint8_t pack_byte(BITS* bits);
 void init_i2c();
 
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
-void print_hex(unsigned int a) {
-	char temp_buf[0x100];
-	snprintf(temp_buf, sizeof(temp_buf), "0x%x ", a);
-	puts(temp_buf);
-}
 
 void init_lcd(void) {
 	// Init lcd log.
@@ -299,50 +290,7 @@ void init_buttons() {
 	STM_EVAL_PBInit(BUTTON_KEY, BUTTON_MODE_EXTI);
 }
 
-uint8_t pack_byte(BITS* bits) {
-	uint8_t byte = 0;
-	for (int8_t bit_index = 7, i = 0; bit_index >= 0; ++i, bit_index--) {
-		assert((bits[i] == ONE_BIT) || (bits[i] == ZERO_BIT));
-		byte |= (uint8_t) (bits[i] << bit_index);
-	}
-	return byte;
-}
 
-/*
- * Prints the bytes from I2C buffer
- */
-void print_i2c_buffer(BITS* buf_bits, size_t size) {
-	uint8_t temp_byte;
-	bool acked;
-
-	if (!size) {
-		return;
-	}
-
-	for (size_t i = 0; i < size;) {
-		// In this case we are waiting for start bit. is the last bit captured a start bit?
-		if (buf_bits[i] == START_BIT) {
-			puts("[");
-			i++;
-		} else if (buf_bits[i] == STOP_BIT) {
-			puts("]");
-			i++;
-		} else {
-			temp_byte = pack_byte(buf_bits + i);
-			i += 8;
-			assert((buf_bits[i] == ONE_BIT) || (buf_bits[i] == ZERO_BIT));
-			acked = (buf_bits[i] == ZERO_BIT);
-			i++;
-			print_hex(temp_byte);
-			if (acked) {
-				puts("ACK ");
-			} else {
-				puts("NACK ");
-			}
-		}
-	}
-	puts("\n");
-}
 /**
  * Interrupts must be as extern!
  */

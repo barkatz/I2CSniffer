@@ -9,13 +9,15 @@ C_SRCS += \
 CPP_SRCS += \
 ../src/BlinkLed.cpp \
 ../src/Timer.cpp \
-../src/main.cpp 
+../src/main.cpp \
+../src/utils.cpp 
 
 OBJS += \
 ./src/BlinkLed.o \
 ./src/Timer.o \
 ./src/_write.o \
-./src/main.o 
+./src/main.o \
+./src/utils.o 
 
 C_DEPS += \
 ./src/_write.d 
@@ -23,7 +25,8 @@ C_DEPS += \
 CPP_DEPS += \
 ./src/BlinkLed.d \
 ./src/Timer.d \
-./src/main.d 
+./src/main.d \
+./src/utils.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
