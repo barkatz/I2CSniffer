@@ -127,10 +127,9 @@ bool wait_for_start_bit = false;
 /********************************************************************************************************
  *  Decl
  *********************************************************************************************************/
-void print_i2c_buffer(BITS* buf_bits, size_t size);
-void init_gpio_interrupts();
+void init_sda_scl_interrupts();
 void init_buttons();
-void init_i2c();
+static void init_gpio_port_interrupts(uint8_t port, uint8_t pin);
 
 /*********************************************************************************************************
  *  Impl
@@ -140,7 +139,65 @@ void init_lcd(void) {
 	// Init lcd log.
 	STM322xG_LCD_Init();
 	LCD_LOG_Init();
-	LCD_LOG_SetHeader((uint8_t*) "I2C Sniffer");
+	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer");
+}
+
+/*
+ * Configures an interrupt for raising/falling edge on Port.Pin
+ */
+static void init_gpio_port_interrupts(uint8_t port, uint8_t pin) {
+	EXTI_InitTypeDef EXTI_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	uint8_t PIN_TO_EXTIX_IRQ[] = {
+			  EXTI0_IRQn, // 0
+			  EXTI1_IRQn, // 1
+			  EXTI2_IRQn, // 2
+			  EXTI3_IRQn, // 3
+			  EXTI4_IRQn, // 4
+			  EXTI9_5_IRQn, // 5
+			  EXTI9_5_IRQn,  //6
+			  EXTI9_5_IRQn,  //7
+			  EXTI9_5_IRQn,  //8
+			  EXTI9_5_IRQn,  //9
+			  EXTI15_10_IRQn, // 10
+			  EXTI15_10_IRQn, // 11
+			  EXTI15_10_IRQn, // 12
+			  EXTI15_10_IRQn, // 13
+			  EXTI15_10_IRQn, // 14
+			  EXTI15_10_IRQn  // 15
+
+	};
+	/* Enable the GPIO clock for the port */
+	RCC_AHB1PeriphClockCmd(PORT_RCC_MASKx(port), ENABLE);
+
+	/* Enable SYSCFG clock */
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	/* Configure Pin.Port pin as input floating */
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Pin = PORT_PIN_MASK(pin);
+	GPIO_Init(PORT_GPIOx(port), &GPIO_InitStructure);
+
+	/* Connect EXTI to the port. Note that PA.i/PB.i... are connected to line_i */
+	SYSCFG_EXTILineConfig(port, pin);
+
+
+	/* Configure EXTI linei, to capture Rising/Falling. */
+	EXTI_InitStructure.EXTI_Line = 1<<pin ;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	/* Enable and set EXTI Line2 Interrupt to the lowest priority */
+	NVIC_InitStructure.NVIC_IRQChannel = PIN_TO_EXTIX_IRQ[pin];
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
 }
 
 /**
@@ -226,61 +283,9 @@ static void I2C_Config(void) {
 }
 
 
-void init_gpio_interrupts() {
-	// TODO: Refactor this into a function and call it on both ports.
-	// Makes PA.2, and PC.0 FLOATING INPUTS, with interrupts to capture fall/rise.
-	EXTI_InitTypeDef EXTI_InitStructure;
-	GPIO_InitTypeDef GPIO_InitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
-
-	/* Enable GPIOA/GPIOAC clock -> Already done in ports...*/
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	/* Enable SYSCFG clock */
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-	/* Configure PA.2 pin as input floating -> Already done in ports...*/
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
-//	GPIO_Init(GPIOA, &GPIO_InitStructure);
-//	/* Configure PC.0 pin as input floating -> Already done in ports...*/
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-//	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	/* Connect EXTI Line0 to PA pin */
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource2);
-//	  /* Connect EXTI Line1 to PC pin */
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource0);
-
-	/* Configure EXTI Line2, to capture Rising/Falling. */
-	EXTI_InitStructure.EXTI_Line = EXTI_Line2;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-
-//	  /* Configure EXTI Line0, to capture Rising/Falling. */
-	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-
-	/* Enable and set EXTI Line2 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI2_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-
-//	  /* Enable and set EXTI Line0 Interrupt to the lowest priority */
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
+void init_sda_scl_interrupts() {
+	init_gpio_port_interrupts(SDA_PORT_IN, SDA_PIN_IN);
+	init_gpio_port_interrupts(SCL_PORT_IN, SCL_PIN_IN);
 }
 
 void init_buttons() {
@@ -464,7 +469,7 @@ int main(int argc, char* argv[]) {
 	init_lcd();
 	init_buttons();
 	I2C_Config();
-	init_gpio_interrupts();
+	init_sda_scl_interrupts();
 	sdaPortOut.write(1);
 
 	while (1) {
