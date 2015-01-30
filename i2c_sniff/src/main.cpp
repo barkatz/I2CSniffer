@@ -29,6 +29,7 @@
 #pragma GCC diagnostic ignored "-Wreturn-type"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
+
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *  PINOUT!
  *~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -89,8 +90,8 @@
 #define I2C_DUTYCYCLE I2C_DutyCycle_16_9
 //#define I2C_SPEED 100000
 //#define I2C_DUTYCYCLE  I2C_DutyCycle_2
-//#define SLAVE_ADDRESS 0x40
-#define SLAVE_ADDRESS 0x80
+//#define SLAVE_ADDRESS 0x80
+#define SLAVE_ADDRESS (0x12)
 /**************************************************
  * Enums & Defines
  ***************************************************/
@@ -115,7 +116,9 @@ InPort sclPortIn(SCL_PORT_IN, SCL_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
 static bool scl_rise = false;
 
 // The prefix of the address to intercept - Always starts with a start bit
-BITS address_to_intercept[] = { ONE_BIT, ZERO_BIT, ZERO_BIT };
+//BITS address_to_intercept[] = { ONE_BIT, ZERO_BIT, ZERO_BIT }; // for 0xd0
+// For 0xd/0xc --> 0b0000110X
+BITS address_to_intercept[] = { ZERO_BIT, ZERO_BIT, ZERO_BIT, ONE_BIT};
 // How many bits already matched.
 uint8_t match_index = 0;
 // A flag to signal interception is in progress in the current transaction
@@ -123,10 +126,14 @@ bool is_intercepting = false;
 // A flag to indicate that an address bit is being flipped.
 bool is_flip = false;
 bool wait_for_start_bit = false;
+uint32_t interception_count = 0;
 
 /********************************************************************************************************
  *  Decl
  *********************************************************************************************************/
+static inline void set_interrupt(FunctionalState state, EXTITrigger_TypeDef trigger, uint32_t port, uint8_t pin);
+
+
 void init_sda_scl_interrupts();
 void init_buttons();
 static void init_gpio_port_interrupts(uint8_t port, uint8_t pin);
@@ -185,11 +192,11 @@ static void init_gpio_port_interrupts(uint8_t port, uint8_t pin) {
 
 
 	/* Configure EXTI linei, to capture Rising/Falling. */
-	EXTI_InitStructure.EXTI_Line = 1<<pin ;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
+//	EXTI_InitStructure.EXTI_Line = 1<<pin ;
+//	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+//	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+//	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+//	EXTI_Init(&EXTI_InitStructure);
 
 	/* Enable and set EXTI Line2 Interrupt to the lowest priority */
 	NVIC_InitStructure.NVIC_IRQChannel = PIN_TO_EXTIX_IRQ[pin];
@@ -197,6 +204,18 @@ static void init_gpio_port_interrupts(uint8_t port, uint8_t pin) {
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
+
+}
+
+
+static inline void set_interrupt(FunctionalState state, EXTITrigger_TypeDef trigger, uint32_t port, uint8_t pin) {
+	EXTI_InitTypeDef EXTI_InitStructure;
+	/* Configure EXTI linei, to capture Rising/Falling. */
+	EXTI_InitStructure.EXTI_Line = 1<<pin ;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = trigger;
+	EXTI_InitStructure.EXTI_LineCmd = state;
+	EXTI_Init(&EXTI_InitStructure);
 
 }
 
@@ -281,6 +300,7 @@ static void I2C_Config(void) {
 	//I2C_ITConfig(I2Cx, I2C_IT_EVT , ENABLE);
 
 }
+
 
 
 void init_sda_scl_interrupts() {
@@ -379,6 +399,7 @@ void EXTI15_10_IRQHandler(void) {
 
 /**
  * SDA Interrupt (PC0)
+ * This is interrupt is ON only when scanning for the start bit!
  */
 void EXTI0_IRQHandler(void) {
 	if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
@@ -392,71 +413,71 @@ void EXTI0_IRQHandler(void) {
 		if (!sda && scl) {
 			// sda is now 0 -> SDA Falls.
 			// If scl is high, and SDA made a transition to 0 -> START BIT
-			wait_for_start_bit = false;
+
+			// 1) disable sda interrupt.
+			set_interrupt(DISABLE, EXTI_Trigger_Falling, SDA_PORT_IN, SDA_PIN_IN);
+			// 2) start clock interrupt.
+			set_interrupt(ENABLE, EXTI_Trigger_Rising_Falling, SCL_PORT_IN, SCL_PIN_IN);
 			is_intercepting = false;
-			// Don't confuse it with a data bit!
-			scl_rise = false;
+
 		}
 	}
 
 }
 
+
+static void inline reset_sda_interrupt() {
+	// Disable the sda interrupt
+	set_interrupt(DISABLE, EXTI_Trigger_Rising, SDA_PORT_IN, SDA_PIN_IN);
+	// And reset the SDA interrupt for the start bit.
+	set_interrupt(ENABLE, EXTI_Trigger_Falling, SDA_PORT_IN, SDA_PIN_IN);
+	// reset the state.
+	match_index = 0;
+	wait_for_start_bit = true;
+
+}
 /*
  * SCL Interrupt (PA2)
  */
 void EXTI2_IRQHandler(void) {
-	static bool temp_bit = 0;
 	if (EXTI_GetITStatus(EXTI_Line2) != RESET) {
 		/* Clear the EXTI line 2 pending bit */
 		EXTI_ClearITPendingBit(EXTI_Line2);
 
-		// Don't do anything if didn't see start bit, and not already matching.
-		if (wait_for_start_bit && (match_index == 0) && !is_flip) {
-			return;
-		}
 		// Get value of sda/scl
 		bool sda = sdaPortIn.read();
 		bool scl = sclPortIn.read();
 
-		// if scl is now 1 -> scl rise -> Some one xmiting a bit
-		// Save the bit value, and wait for scl fall to add it
+
+		if (is_flip) {
+			is_flip = false;
+			//puts("Stop!\n");
+			sdaPortOut.write(1); // Pulled up.
+			// Flipped a bit, start scannining for start bit again.
+			reset_sda_interrupt();
+		}
+		// Only do it on rise.
 		if (scl) {
-			temp_bit = sda;
-			scl_rise = true;
-		} else {
-			// if scl is now 0 -> scl fall.
-			// when scl falls the second time, we stop the flipping.
-			if (is_flip) {
-				is_flip = false;
-//				puts("Stop!\n");
-				sdaPortOut.write(1); // Pulled up.
+			// Check if we have a matching bit
+			if (address_to_intercept[match_index] == (BITS) sda) {
+				match_index++;
+			} else {
+				// Not a matching address... start scanning for start bit all over again.
+				// Disable the sda interrupt
+				reset_sda_interrupt();
 			}
-			// if we had a rise before add this bit.
-			// if not its probably a start/stop bit, ignore it.
-			if (scl_rise) {
-				// Check if we have a matching bit
-				if (address_to_intercept[match_index] == (BITS) temp_bit) {
-					match_index++;
-				} else {
-					match_index = 0;
-					wait_for_start_bit = true;
-				}
 
-				// Check if we matched the entire prefix.
-				if (match_index == sizeof(address_to_intercept)) {
-					// Set the intercption flag, and mark that we are flipping a bit.
-					is_intercepting = true;
-					wait_for_start_bit = true;
-					is_flip = true;
-					// Stop matching until next start
-					match_index = 0;
-					// LCD_BarLog("Matched!\n");
-					// Prepare a 0 on the sda line for next bit
-					sdaPortOut.write(0);
+			// in case of a matching bit, check if we have matched the entire address prefix.
+			if (match_index == sizeof(address_to_intercept)) {
+				// LCD_BarLog("Matched!\n");
+				// Prepare a 0 on the sda line for next bit
+				sdaPortOut.write(0);
 
-				}
+				// Set the intercption flag, and mark that we are flipping a bit.
+				is_intercepting = true;
+				is_flip = true;
+				interception_count++;
 			}
-			scl_rise = false;
 		}
 	}
 }
@@ -468,14 +489,16 @@ int main(int argc, char* argv[]) {
 	sdaPortOut.write(1);
 	init_lcd();
 	init_buttons();
-	I2C_Config();
+
 	init_sda_scl_interrupts();
+	// We start only the SDA interrupt.
+	set_interrupt(ENABLE, EXTI_Trigger_Falling, SDA_PORT_IN, SDA_PIN_IN);
 	sdaPortOut.write(1);
 
 	while (1) {
 
 	}
-
+	I2C_Config();
 }
 
 #pragma GCC diagnostic pop
