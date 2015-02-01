@@ -13,6 +13,8 @@ RM := rm -rf
 -include system/src/diag/subdir.mk
 -include system/src/cortexm/subdir.mk
 -include system/src/cmsis/subdir.mk
+-include src/Drivers/i2c/subdir.mk
+-include src/Drivers/gpio/subdir.mk
 -include src/Drivers/LCD/subdir.mk
 -include src/Drivers/subdir.mk
 -include src/subdir.mk
