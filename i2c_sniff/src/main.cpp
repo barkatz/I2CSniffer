@@ -222,12 +222,14 @@ void EXTI0_IRQHandler(void) {
 
 	}
 }
-
+GPIO_TypeDef* GPIOx  = PORT_GPIOx(SDA_PORT_IN);
+//uint32_t pinpos 	= SDA_PIN_IN;
 /*
  * SCL Interrupt (PA2)
  */
 void EXTI2_IRQHandler(void) {
 	EXTI->PR = 1<<SCL_PIN_IN;
+	bool scl_risen = false;
 	bool sda = read(SDA_PORT_IN, SDA_PIN_IN);
 	// Are we currently fliping a bit?
 	switch (state) {
@@ -257,7 +259,7 @@ void EXTI2_IRQHandler(void) {
 			break;
 
 		case FLIP_BIT_END:
-			// Realse SDA. We are done !
+			// Realse SDA. We are done ! This works like shit
 			write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
 			// Restore to interrupts to capture scl raise (for data bits)
 			EXTI->RTSR |= (1 << SCL_PIN_IN);
@@ -265,8 +267,7 @@ void EXTI2_IRQHandler(void) {
 			// 1) disable SCL interrupt
 			mask_interrupt(SCL_PIN_IN);
 			// 2) enable SDA interrupt (searching for start bit)
-//			unmask_interrupt(SDA_PIN_IN);
-//			LCD_BarLog("Interception!\n");
+			unmask_interrupt(SDA_PIN_IN);
 			break;
 		}
 }
@@ -275,86 +276,12 @@ void EXTI2_IRQHandler(void) {
 #endif
 
 
-
-void do_it() {
-	bool register sda = true;
-	bool register scl = true;
-	uint32_t addr = 0;
-//	FLIP_STATE state = SCAN_FOR_START;
-	 state = SCAN_FOR_START;
-	while (1) {
-		// Get value of sda/scl
-		bool volatile register curr_sda = read(SDA_PORT_IN, SDA_PIN_IN);
-		bool volatile register curr_scl = read(SCL_PORT_IN, SCL_PIN_IN);
-
-		switch (state) {
-		case SCAN_FOR_START:
-			if ((sda && !curr_sda) && (curr_scl)) {
-				state = MATCH_PREFIX;
-				match_index = 0;
-			}
-			break;
-		case MATCH_PREFIX:
-			// Clock up
-			if (curr_scl && !scl) {
-				// Check for a match
-				if (sda == address_to_intercept[match_index]) {
-					// Got a match
-					match_index++;
-					// Are we done matching the entire thing?
-					if (match_index == sizeof(address_to_intercept)) {
-						// Start flpping the next bit.
-						state = FLIP_BIT_START;
-					}
-
-				} else {
-					// Not matching, keep scanning
-					state = SCAN_FOR_START;
-				}
-			}
-			break;
-
-		case FLIP_BIT_START:
-			// Wait for clock fall, to start flipping.
-			if (!curr_scl && scl) {
-				// Pull SDA low
-				write(SDA_PORT_OUT, SDA_PIN_OUT, 0);
-				// Wait for clock to go down again
-				state = FLIP_BIT_END;
-			}
-			break;
-//		case CLOCK_UP:
-//			// Wait for clock up
-//			if (curr_scl && !scl) {
-//				// if clock is up, wait for it to go down and close the deal.
-//				state = FLIP_BIT_END;
-//			}
-//			break;
-		case FLIP_BIT_END:
-			// Wait for clock fall again, to stop flipping.
-			if (!curr_scl && scl) {
-				// Pull SDA low
-				write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
-				// Done. Go back to start
-				state = SCAN_FOR_START;
-			}
-			break;
-
-		} /* switch */
-
-		scl = curr_scl;
-		sda = curr_sda;
-	}
-
-}
-
 int main(int argc, char* argv[]) {
 	// Sda port is pulled up. Let it go floating.
 	sdaPortOut.write(1);
 	init_lcd();
 	init_buttons();
 	//i2c_init();
-//	do_it();
 
 	/*
 	 * Set up interrupts.

@@ -74,7 +74,7 @@ typedef enum
   * @brief  GPIO Output type enumeration 
   */  
 typedef enum
-{ 
+{
   GPIO_OType_PP = 0x00,
   GPIO_OType_OD = 0x01
 }GPIOOType_TypeDef;
