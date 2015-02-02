@@ -129,8 +129,12 @@ void I2Cx_ER_IRQHANDLER(void) {
 }
 
 
-uint32_t events[0x30];
-uint32_t z = 0;
+uint32_t volatile events[0x100];
+uint32_t z1 = 0;
+
+uint32_t volatile data_read[0x100];
+uint32_t z2 = 0;
+
 /**
  * @brief  This function handles I2Cx event interrupt request.
  * @param  None
@@ -139,10 +143,15 @@ uint32_t z = 0;
 void I2Cx_EV_IRQHANDLER(void) {
 	__IO uint32_t Event = 0x00;
 	/* Get Last I2C Event */
-	events[z++] = Event;
 	Event = I2C_GetLastEvent(I2Cx);
-//	LCD_BarLog("I2C EVENT!\n");
-//	uint8_t temp;
+
+	if (z1<sizeof(events)) { events[z1++] = Event; }
+	// If address matched -> search for start bit!
+	if (I2C_SR1_ADDR & Event) {
+		//unmask_interrupt(SDA_PIN_IN);
+		LCD_BarLog("OK\n");
+	}
+
 	switch (Event) {
 	/* ****************************************************************************/
 	/*                          Slave Transmitter Events                          */
@@ -168,7 +177,7 @@ void I2Cx_EV_IRQHANDLER(void) {
 	/* Master is trying to write to us... */
 	case I2C_EVENT_SLAVE_RECEIVER_ADDRESS_MATCHED:
 		unmask_interrupt(SDA_PIN_IN);
-//		Rx_Idx = 0x00;
+		if (z2<sizeof(data_read)) {	 data_read[z2++] = (uint8_t)I2Cx->DR; }
 		break;
 
 		/* Check on EV2*/
@@ -181,8 +190,7 @@ void I2Cx_EV_IRQHANDLER(void) {
 	case I2C_EVENT_SLAVE_STOP_DETECTED:
 //		I2C_GetFlagStatus(I2Cx, I2C_FLAG_STOPF);
 //		I2C_Cmd(I2Cx, ENABLE);
-		// Start scanning for start bit
-		unmask_interrupt(SDA_PIN_IN);
+
 		break;
 
 	default:
@@ -196,7 +204,14 @@ void I2Cx_EV_IRQHANDLER(void) {
 void EXTI15_10_IRQHandler(void) {
 	EXTI_ClearFlag(EXTI_Line15);
 	init_lcd();
-	LCD_BarLog("%u\n", (unsigned int) events[9]);
+
+	LCD_BarLog("%d\n", (unsigned int)events[0]);
+	LCD_BarLog("%d\n", (unsigned int)events[1]);
+	LCD_BarLog("%d\n", (unsigned int)events[2]);
+	LCD_BarLog("%d\n", (unsigned int)events[3]);
+	LCD_BarLog("%d\n", (unsigned int)events[4]);
+
+
 }
 
 /**
@@ -267,7 +282,8 @@ void EXTI2_IRQHandler(void) {
 			// 1) disable SCL interrupt
 			mask_interrupt(SCL_PIN_IN);
 			// 2) enable SDA interrupt (searching for start bit)
-			unmask_interrupt(SDA_PIN_IN);
+			// Will be enabled in i2c :)
+			//	unmask_interrupt(SDA_PIN_IN);
 			break;
 		}
 }
@@ -281,7 +297,7 @@ int main(int argc, char* argv[]) {
 	sdaPortOut.write(1);
 	init_lcd();
 	init_buttons();
-	//i2c_init();
+	i2c_init();
 
 	/*
 	 * Set up interrupts.
