@@ -38,7 +38,6 @@ enum FLIP_STATE {
 	SCAN_FOR_START,
 	MATCH_PREFIX,
 	FLIP_BIT_START,
-//	CLOCK_UP,
 	FLIP_BIT_END
 };
 /********************************************************************************************************
@@ -62,19 +61,27 @@ InPort sclPortIn(SCL_PORT_IN, SCL_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
 // The prefix of the address to intercept - Always starts with a start bit
 //BITS address_to_intercept[] = { ONE_BIT, ZERO_BIT, ZERO_BIT }; // for 0xd0
 // For 0xd/0xc --> 0b0000110X
-BITS address_to_intercept[] = { ZERO_BIT, ZERO_BIT, ZERO_BIT, ONE_BIT};
+BITS address_to_intercept[] = { ZERO_BIT , ZERO_BIT, ZERO_BIT, ONE_BIT };
 // How many bits already matched.
 uint8_t match_index = 0;
-// A flag to signal interception is in progress in the current transaction
-bool is_intercepting = false;
-// A flag to indicate that an address bit is being flipped.
-bool is_flip = false;
+// State of the state machine that flips.
 FLIP_STATE state;
+
 
 uint32_t interception_count = 0;
 uint32_t miss_count = 0;
 
-uint32_t c = 0;
+uint32_t reg_index = 0;
+uint8_t regs[] = 	{	0,	 	0,		0,	 	0xc4, 	0xff, 	0xae, 	0xff, 	0x6c, // 0x0 	- 	0x7
+						0x01,	0,	 	0,	 	0, 		0, 		0,		0,		0,	  // 0x8 	- 	0xF
+						0,		0, 		0, 		0, 		0, 		0,		0,		0,	  // 0x10 	-	0x17
+						0,		0, 	 	0, 		0, 		0, 		0,		0,		0,	  // 0x18 	-	0x1f
+						0,		0, 	 	0, 		0, 		0, 		0,		0,		0,	  // 0x20 	-	0x27
+						0,		0, 	 	0, 		0, 		0, 		0,		0,		0,
+						0,		0, 	 	0, 		0, 		0, 		0,		0,		0,
+						0,		0, 	 	0, 		0, 		0, 		0,		0,		0 };
+
+
 /********************************************************************************************************
  *  Decl
  *********************************************************************************************************/
@@ -128,13 +135,16 @@ void I2Cx_ER_IRQHANDLER(void) {
 
 }
 
+struct i2c_event {
+uint32_t event;
+uint8_t dr;
+};
 
-uint32_t volatile events[0x100];
-uint32_t z1 = 0;
+i2c_event volatile events[0x300];
+uint32_t z = 0;
 
-uint32_t volatile data_read[0x100];
-uint32_t z2 = 0;
 
+uint32_t sent_bytes = 0;
 /**
  * @brief  This function handles I2Cx event interrupt request.
  * @param  None
@@ -144,58 +154,70 @@ void I2Cx_EV_IRQHANDLER(void) {
 	__IO uint32_t Event = 0x00;
 	/* Get Last I2C Event */
 	Event = I2C_GetLastEvent(I2Cx);
+	uint8_t dr =  (uint8_t)I2Cx->DR;
 
-	if (z1<sizeof(events)) { events[z1++] = Event; }
-	// If address matched -> search for start bit!
-	if (I2C_SR1_ADDR & Event) {
-		//unmask_interrupt(SDA_PIN_IN);
-		LCD_BarLog("OK\n");
+
+	if (z >= sizeof(events)/sizeof(i2c_event)) {
+		mask_interrupt(SDA_PIN_IN);
+		LCD_BarLog("Cant record anymore events\n");
+		return;
 	}
+	events[z].event = Event;
+	events[z].dr = dr;
+	z++;
 
+	// If address matched -> search for start bit!
+	if ((I2C_SR1_ADDR | I2C_EVENT_SLAVE_STOP_DETECTED) & Event)  {
+//		if (interception_count<0x50) {
+			unmask_interrupt(SDA_PIN_IN);
+			interception_count++;
+//		} else {
+//			LCD_BarLog("Done\n");
+//		}
+	}
 	switch (Event) {
 	/* ****************************************************************************/
 	/*                          Slave Transmitter Events                          */
-	/*                                                                            */
 	/* ****************************************************************************/
-
-	/* Check on EV1 */
 	case I2C_EVENT_SLAVE_TRANSMITTER_ADDRESS_MATCHED:
-		I2C_SendData(I2Cx, 0xdd);
+//		LCD_BarLog("Transmitter (Reading...) address matched\n");
+		I2C_SendData(I2Cx, regs[reg_index++]);
+		sent_bytes++;
 		//I2C_ITConfig(I2Cx, I2C_IT_BUF, ENABLE);
 		break;
-		/* Check on EV3 */
+
 	case I2C_EVENT_SLAVE_BYTE_TRANSMITTING:
 	case I2C_EVENT_SLAVE_BYTE_TRANSMITTED:
-		I2C_SendData(I2Cx, 0xbb);
+		//LCD_BarLog("Xmitting a byte to master\n");
+		I2C_SendData(I2Cx, regs[reg_index++]);
 		break;
 
-		/* ****************************************************************************/
-		/*                              Slave Receiver Events                         */
-		/*                                                                            */
-		/* ****************************************************************************/
-
-	/* Master is trying to write to us... */
+	/* ****************************************************************************/
+	/*                              Slave Receiver Events                         */
+	/* ****************************************************************************/
+	/* Master is trying to write to us... 0x00020002(131074)
+	 * This means our address with write bit was matched.						  */
 	case I2C_EVENT_SLAVE_RECEIVER_ADDRESS_MATCHED:
-		unmask_interrupt(SDA_PIN_IN);
-		if (z2<sizeof(data_read)) {	 data_read[z2++] = (uint8_t)I2Cx->DR; }
 		break;
 
-		/* Check on EV2*/
+	/*  Address matched (0x2) and DR contains data (0x40). */
+	case 0x20042:
+		reg_index = dr;
+		break;
+	/* 0x200 */
 	case I2C_EVENT_SLAVE_BYTE_RECEIVED:
 	case (I2C_EVENT_SLAVE_BYTE_RECEIVED | I2C_SR1_BTF):
-//		temp = I2C_ReceiveData(I2Cx);
+		regs[reg_index++] = dr;
 		break;
 
-		/* Check on EV4 */
-	case I2C_EVENT_SLAVE_STOP_DETECTED:
-//		I2C_GetFlagStatus(I2Cx, I2C_FLAG_STOPF);
-//		I2C_Cmd(I2Cx, ENABLE);
 
+	case I2C_EVENT_SLAVE_STOP_DETECTED:
 		break;
 
 	default:
 		break;
 	}
+	reg_index = reg_index % sizeof(regs);
 }
 /*
  *  Button handler (KEY button is IRQ-15)
@@ -204,14 +226,6 @@ void I2Cx_EV_IRQHANDLER(void) {
 void EXTI15_10_IRQHandler(void) {
 	EXTI_ClearFlag(EXTI_Line15);
 	init_lcd();
-
-	LCD_BarLog("%d\n", (unsigned int)events[0]);
-	LCD_BarLog("%d\n", (unsigned int)events[1]);
-	LCD_BarLog("%d\n", (unsigned int)events[2]);
-	LCD_BarLog("%d\n", (unsigned int)events[3]);
-	LCD_BarLog("%d\n", (unsigned int)events[4]);
-
-
 }
 
 /**
@@ -237,7 +251,7 @@ void EXTI0_IRQHandler(void) {
 
 	}
 }
-GPIO_TypeDef* GPIOx  = PORT_GPIOx(SDA_PORT_IN);
+GPIO_TypeDef* GPIOx  = PORT_GPIOx(SDA_PORT_OUT);
 //uint32_t pinpos 	= SDA_PIN_IN;
 /*
  * SCL Interrupt (PA2)
@@ -269,13 +283,30 @@ void EXTI2_IRQHandler(void) {
 			break;
 		case FLIP_BIT_START:
 			// Pull SDA low and wait for next scl fall.
+//			for (int i=0; i<23; i++) {
+//				write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
+//			}
 			write(SDA_PORT_OUT, SDA_PIN_OUT, 0);
+
 			state = FLIP_BIT_END;
 			break;
 
 		case FLIP_BIT_END:
 			// Realse SDA. We are done ! This works like shit
-			write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
+//		    GPIOx->PUPDR &= ~(GPIO_PUPDR_PUPDR0 << ((uint16_t)SDA_PIN_OUT * 2));
+//		    GPIOx->PUPDR |= (GPIO_PuPd_NOPULL << (SDA_PIN_OUT * 2));
+//	        /* Output mode configuration*/
+//	        GPIOx->OTYPER  &= ~((GPIO_OTYPER_OT_0) << ((uint16_t)SDA_PIN_OUT)) ;
+//	        GPIOx->OTYPER |= (uint16_t)(GPIO_OType_PP << ((uint16_t)SDA_PIN_OUT));
+//		    for (int i=0; i<15; i++) {
+		    	write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
+//		    }
+//		    GPIOx->PUPDR &= ~(GPIO_PUPDR_PUPDR0 << ((uint16_t)SDA_PIN_OUT * 2));
+//		    GPIOx->PUPDR |= (GPIO_PuPd_UP << (SDA_PIN_OUT * 2));
+//	        GPIOx->OTYPER  &= ~((GPIO_OTYPER_OT_0) << ((uint16_t)SDA_PIN_OUT)) ;
+//	        GPIOx->OTYPER |= (uint16_t)(GPIO_OType_OD << ((uint16_t)SDA_PIN_OUT));
+
+
 			// Restore to interrupts to capture scl raise (for data bits)
 			EXTI->RTSR |= (1 << SCL_PIN_IN);
 			EXTI->FTSR &= ~(1 << SCL_PIN_IN);
@@ -283,7 +314,7 @@ void EXTI2_IRQHandler(void) {
 			mask_interrupt(SCL_PIN_IN);
 			// 2) enable SDA interrupt (searching for start bit)
 			// Will be enabled in i2c :)
-			//	unmask_interrupt(SDA_PIN_IN);
+//			unmask_interrupt(SDA_PIN_IN);
 			break;
 		}
 }
