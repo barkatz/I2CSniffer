@@ -4,8 +4,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include "lcd_log.h"
-#include "Drivers\port.h"
-#include "Drivers/i2c/i2c.hpp"
+//#include "Drivers\port.h"
 #include "Drivers/gpio/gpio.hpp"
 #include "utils.hpp"
 #include "stm32f2xx.h"
@@ -214,13 +213,13 @@ void inline scan_start_bit() {
  * SCL Interrupt (PA2)
  */
 void EXTI2_IRQHandler(void) {
-	static volatile uint8_t bit_count = 0;
-	static volatile uint32_t byte_to_recv = 0;
-	static bool is_read = 0;
-	static uint32_t byte_to_send = 0x01;
-	static unsigned int last_byte_written = 0;
-	static uint32_t 	 read_index = 0;
-	bool stop_bit = false;
+	static volatile uint8_t 	bit_count 			= 0; 		// Bit count for receiving/xmiting a byte
+	static volatile uint32_t 	byte_to_recv 		= 0; 		// a temp byte to receive.
+	static bool 				is_read 			= 0;		// a flag to indiciate whether master is reading/writing
+	static uint32_t 			byte_to_send 		= 0x01;		// A temp byte for sending
+	static unsigned int 		last_byte_written	= 0;		// The last byte written
+	static uint32_t 	 		read_index 			= 0;		// The read index in a long read transaction
+	bool 						stop_bit 			= false;	// Did we hit a stop bit after a write transaction.
 
 	// Read lines
 	bool scl = READ_SCL();

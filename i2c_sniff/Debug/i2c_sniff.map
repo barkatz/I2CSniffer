@@ -1837,7 +1837,6 @@ Discarded input sections
  .group         0x00000000        0x8 ./src/Drivers/gpio/gpio.o
  .group         0x00000000        0x8 ./src/Drivers/gpio/gpio.o
  .group         0x00000000        0x8 ./src/Drivers/gpio/gpio.o
- .group         0x00000000        0x8 ./src/Drivers/gpio/gpio.o
  .text          0x00000000        0x0 ./src/Drivers/gpio/gpio.o
  .data          0x00000000        0x0 ./src/Drivers/gpio/gpio.o
  .bss           0x00000000        0x0 ./src/Drivers/gpio/gpio.o
@@ -2406,95 +2405,6 @@ Discarded input sections
  .debug_macro   0x00000000       0x34 ./src/Drivers/LCD/stm32f2xx_fsmc.o
  .debug_macro   0x00000000       0x82 ./src/Drivers/LCD/stm32f2xx_fsmc.o
  .debug_macro   0x00000000       0x35 ./src/Drivers/LCD/stm32f2xx_fsmc.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .group         0x00000000        0x8 ./src/Drivers/port.o
- .text          0x00000000        0x0 ./src/Drivers/port.o
- .data          0x00000000        0x0 ./src/Drivers/port.o
- .bss           0x00000000        0x0 ./src/Drivers/port.o
- .debug_info    0x00000000       0x96 ./src/Drivers/port.o
- .debug_abbrev  0x00000000       0x4e ./src/Drivers/port.o
- .debug_aranges
-                0x00000000       0x18 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x1a8 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x8ec ./src/Drivers/port.o
- .debug_macro   0x00000000       0x50 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x3a ./src/Drivers/port.o
- .debug_macro   0x00000000       0x1c ./src/Drivers/port.o
- .debug_macro   0x00000000       0x22 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x44 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x1c ./src/Drivers/port.o
- .debug_macro   0x00000000      0x1f7 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x2d ./src/Drivers/port.o
- .debug_macro   0x00000000      0xbb1 ./src/Drivers/port.o
- .debug_macro   0x00000000     0x7f9a ./src/Drivers/port.o
- .debug_macro   0x00000000      0x455 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x3cf ./src/Drivers/port.o
- .debug_macro   0x00000000      0x111 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x188 ./src/Drivers/port.o
- .debug_macro   0x00000000       0xb2 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x149 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x477 ./src/Drivers/port.o
- .debug_macro   0x00000000       0xb4 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x242 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x279 ./src/Drivers/port.o
- .debug_macro   0x00000000       0xb5 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x25e ./src/Drivers/port.o
- .debug_macro   0x00000000      0x2b4 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x64 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x88 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x575 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x40 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x3f3 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x344 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x358 ./src/Drivers/port.o
- .debug_macro   0x00000000       0xe1 ./src/Drivers/port.o
- .debug_macro   0x00000000      0x73b ./src/Drivers/port.o
- .debug_macro   0x00000000      0x223 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x34 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x82 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x35 ./src/Drivers/port.o
- .debug_macro   0x00000000       0x16 ./src/Drivers/port.o
- .debug_line    0x00000000      0x49b ./src/Drivers/port.o
- .debug_str     0x00000000    0x54dd9 ./src/Drivers/port.o
- .comment       0x00000000       0x71 ./src/Drivers/port.o
- .ARM.attributes
-                0x00000000       0x33 ./src/Drivers/port.o
  .group         0x00000000        0x8 ./src/_write.o
  .group         0x00000000        0x8 ./src/_write.o
  .group         0x00000000        0x8 ./src/_write.o
@@ -2552,8 +2462,6 @@ Discarded input sections
  .debug_frame   0x00000000       0x28 ./src/_write.o
  .ARM.attributes
                 0x00000000       0x33 ./src/_write.o
- .group         0x00000000        0x8 ./src/main.o
- .group         0x00000000        0x8 ./src/main.o
  .group         0x00000000        0x8 ./src/main.o
  .group         0x00000000        0x8 ./src/main.o
  .group         0x00000000        0x8 ./src/main.o
@@ -2709,9 +2617,7 @@ Discarded input sections
  .debug_macro   0x00000000      0x423 ./src/main.o
  .debug_macro   0x00000000       0x28 ./src/main.o
  .debug_macro   0x00000000       0x2e ./src/main.o
- .debug_macro   0x00000000       0x1c ./src/main.o
- .debug_macro   0x00000000       0x7c ./src/main.o
- .debug_macro   0x00000000       0x2e ./src/main.o
+ .debug_macro   0x00000000       0x40 ./src/main.o
  .group         0x00000000        0x8 ./src/utils.o
  .text          0x00000000        0x0 ./src/utils.o
  .data          0x00000000        0x0 ./src/utils.o
@@ -2912,7 +2818,6 @@ LOAD ./src/Drivers/LCD/lcd_log.o
 LOAD ./src/Drivers/LCD/stm322xg_eval.o
 LOAD ./src/Drivers/LCD/stm322xg_eval_lcd.o
 LOAD ./src/Drivers/LCD/stm32f2xx_fsmc.o
-LOAD ./src/Drivers/port.o
 LOAD ./src/_write.o
 LOAD ./src/main.o
 LOAD ./src/utils.o
@@ -3941,7 +3846,7 @@ END GROUP
  .debug_abbrev  0x000021eb      0x1e0 ./src/Drivers/LCD/stm32f2xx_fsmc.o
  .debug_abbrev  0x000023cb      0x4f9 ./src/main.o
 
-.debug_line     0x00000000     0x8fed
+.debug_line     0x00000000     0x8f91
  *(.debug_line)
  .debug_line    0x00000000      0x578 ./system/src/stm32f2-stdperiph/misc.o
  .debug_line    0x00000578      0x693 ./system/src/stm32f2-stdperiph/stm32f2xx_exti.o
@@ -3959,13 +3864,13 @@ END GROUP
  .debug_line    0x000045c1       0xbf ./system/src/cortexm/exception_handlers.o
  .debug_line    0x00004680      0x501 ./system/src/cmsis/system_stm32f2xx.o
  .debug_line    0x00004b81       0x8e ./system/src/cmsis/vectors_stm32f2xx.o
- .debug_line    0x00004c0f      0x51a ./src/Drivers/gpio/gpio.o
- .debug_line    0x00005129      0x1f0 ./src/Drivers/LCD/fonts.o
- .debug_line    0x00005319      0x7e3 ./src/Drivers/LCD/lcd_log.o
- .debug_line    0x00005afc      0x75e ./src/Drivers/LCD/stm322xg_eval.o
- .debug_line    0x0000625a     0x16b0 ./src/Drivers/LCD/stm322xg_eval_lcd.o
- .debug_line    0x0000790a      0x9fe ./src/Drivers/LCD/stm32f2xx_fsmc.o
- .debug_line    0x00008308      0xce5 ./src/main.o
+ .debug_line    0x00004c0f      0x4fd ./src/Drivers/gpio/gpio.o
+ .debug_line    0x0000510c      0x1f0 ./src/Drivers/LCD/fonts.o
+ .debug_line    0x000052fc      0x7e3 ./src/Drivers/LCD/lcd_log.o
+ .debug_line    0x00005adf      0x75e ./src/Drivers/LCD/stm322xg_eval.o
+ .debug_line    0x0000623d     0x16b0 ./src/Drivers/LCD/stm322xg_eval_lcd.o
+ .debug_line    0x000078ed      0x9fe ./src/Drivers/LCD/stm32f2xx_fsmc.o
+ .debug_line    0x000082eb      0xca6 ./src/main.o
 
 .debug_frame    0x00000000     0x21d8
  *(.debug_frame)
@@ -4014,7 +3919,7 @@ END GROUP
  .debug_frame   0x00002170       0x34 c:/program files (x86)/gnu tools arm embedded/4.9 2014q4/bin/../lib/gcc/arm-none-eabi/4.9.3/armv7-m\libgcc.a(_divdi3.o)
  .debug_frame   0x000021a4       0x34 c:/program files (x86)/gnu tools arm embedded/4.9 2014q4/bin/../lib/gcc/arm-none-eabi/4.9.3/armv7-m\libgcc.a(_udivdi3.o)
 
-.debug_str      0x00000000    0x62d19
+.debug_str      0x00000000    0x62afc
  *(.debug_str)
  .debug_str     0x00000000    0x54bf1 ./system/src/stm32f2-stdperiph/misc.o
                               0x54d99 (size before relaxing)
@@ -4048,20 +3953,20 @@ END GROUP
                               0x54d63 (size before relaxing)
  .debug_str     0x0005b5d9       0x57 ./system/src/cmsis/vectors_stm32f2xx.o
                                0x254e (size before relaxing)
- .debug_str     0x0005b630      0xbe2 ./src/Drivers/gpio/gpio.o
-                              0x5590d (size before relaxing)
- .debug_str     0x0005c212       0xd1 ./src/Drivers/LCD/fonts.o
+ .debug_str     0x0005b630      0xbeb ./src/Drivers/gpio/gpio.o
+                              0x558fc (size before relaxing)
+ .debug_str     0x0005c21b       0xd1 ./src/Drivers/LCD/fonts.o
                                0x331b (size before relaxing)
- .debug_str     0x0005c2e3     0x2b1d ./src/Drivers/LCD/lcd_log.o
+ .debug_str     0x0005c2ec     0x2b1d ./src/Drivers/LCD/lcd_log.o
                               0x5a7ef (size before relaxing)
- .debug_str     0x0005ee00      0x596 ./src/Drivers/LCD/stm322xg_eval.o
+ .debug_str     0x0005ee09      0x596 ./src/Drivers/LCD/stm322xg_eval.o
                               0x5760f (size before relaxing)
- .debug_str     0x0005f396      0x6b0 ./src/Drivers/LCD/stm322xg_eval_lcd.o
+ .debug_str     0x0005f39f      0x6b0 ./src/Drivers/LCD/stm322xg_eval_lcd.o
                               0x57b45 (size before relaxing)
- .debug_str     0x0005fa46      0x4d3 ./src/Drivers/LCD/stm32f2xx_fsmc.o
+ .debug_str     0x0005fa4f      0x4d3 ./src/Drivers/LCD/stm32f2xx_fsmc.o
                               0x55265 (size before relaxing)
- .debug_str     0x0005ff19     0x2e00 ./src/main.o
-                              0x5d9f8 (size before relaxing)
+ .debug_str     0x0005ff22     0x2bda ./src/main.o
+                              0x5d7c1 (size before relaxing)
 
 .debug_loc      0x00000000     0x91f4
  *(.debug_loc)
@@ -4124,7 +4029,7 @@ OUTPUT(i2c_sniff.elf elf32-littlearm)
  .debug_ranges  0x000030a0       0xa0 ./src/Drivers/LCD/stm32f2xx_fsmc.o
  .debug_ranges  0x00003140      0x160 ./src/main.o
 
-.debug_macro    0x00000000    0x12356
+.debug_macro    0x00000000    0x12331
  .debug_macro   0x00000000      0x1a4 ./system/src/stm32f2-stdperiph/misc.o
  .debug_macro   0x000001a4      0x88c ./system/src/stm32f2-stdperiph/misc.o
  .debug_macro   0x00000a30       0x50 ./system/src/stm32f2-stdperiph/misc.o
@@ -4217,33 +4122,32 @@ OUTPUT(i2c_sniff.elf elf32-littlearm)
  .debug_macro   0x000100ad       0x1b ./system/src/cortexm/exception_handlers.o
  .debug_macro   0x000100c8      0x1b7 ./system/src/cmsis/system_stm32f2xx.o
  .debug_macro   0x0001027f       0x1b ./system/src/cmsis/vectors_stm32f2xx.o
- .debug_macro   0x0001029a      0x1ab ./src/Drivers/gpio/gpio.o
- .debug_macro   0x00010445       0x1c ./src/Drivers/gpio/gpio.o
- .debug_macro   0x00010461       0x2e ./src/Drivers/gpio/gpio.o
- .debug_macro   0x0001048f       0x60 ./src/Drivers/LCD/fonts.o
- .debug_macro   0x000104ef      0x2c2 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x000107b1      0x3d4 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x00010b85      0x2ea ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x00010e6f       0x10 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x00010e7f      0x423 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x000112a2       0x97 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x00011339       0xfd ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x00011436       0x28 ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x0001145e       0x2e ./src/Drivers/LCD/lcd_log.o
- .debug_macro   0x0001148c      0x1b1 ./src/Drivers/LCD/stm322xg_eval.o
- .debug_macro   0x0001163d      0x1ed ./src/Drivers/LCD/stm322xg_eval_lcd.o
- .debug_macro   0x0001182a      0x1ce ./src/Drivers/LCD/stm32f2xx_fsmc.o
- .debug_macro   0x000119f8      0x273 ./src/Drivers/LCD/stm32f2xx_fsmc.o
- .debug_macro   0x00011c6b      0x4ed ./src/main.o
- .debug_macro   0x00012158       0x1c ./src/main.o
- .debug_macro   0x00012174       0x6e ./src/main.o
- .debug_macro   0x000121e2       0x28 ./src/main.o
- .debug_macro   0x0001220a       0x11 ./src/main.o
- .debug_macro   0x0001221b       0x12 ./src/main.o
- .debug_macro   0x0001222d       0x82 ./src/main.o
- .debug_macro   0x000122af       0x12 ./src/main.o
- .debug_macro   0x000122c1       0x12 ./src/main.o
- .debug_macro   0x000122d3       0x46 ./src/main.o
- .debug_macro   0x00012319       0x17 ./src/main.o
- .debug_macro   0x00012330       0x10 ./src/main.o
- .debug_macro   0x00012340       0x16 ./src/main.o
+ .debug_macro   0x0001029a      0x1a2 ./src/Drivers/gpio/gpio.o
+ .debug_macro   0x0001043c       0x40 ./src/Drivers/gpio/gpio.o
+ .debug_macro   0x0001047c       0x60 ./src/Drivers/LCD/fonts.o
+ .debug_macro   0x000104dc      0x2c2 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x0001079e      0x3d4 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00010b72      0x2ea ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00010e5c       0x10 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00010e6c      0x423 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x0001128f       0x97 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00011326       0xfd ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00011423       0x28 ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x0001144b       0x2e ./src/Drivers/LCD/lcd_log.o
+ .debug_macro   0x00011479      0x1b1 ./src/Drivers/LCD/stm322xg_eval.o
+ .debug_macro   0x0001162a      0x1ed ./src/Drivers/LCD/stm322xg_eval_lcd.o
+ .debug_macro   0x00011817      0x1ce ./src/Drivers/LCD/stm32f2xx_fsmc.o
+ .debug_macro   0x000119e5      0x273 ./src/Drivers/LCD/stm32f2xx_fsmc.o
+ .debug_macro   0x00011c58      0x4db ./src/main.o
+ .debug_macro   0x00012133       0x1c ./src/main.o
+ .debug_macro   0x0001214f       0x6e ./src/main.o
+ .debug_macro   0x000121bd       0x28 ./src/main.o
+ .debug_macro   0x000121e5       0x11 ./src/main.o
+ .debug_macro   0x000121f6       0x12 ./src/main.o
+ .debug_macro   0x00012208       0x82 ./src/main.o
+ .debug_macro   0x0001228a       0x12 ./src/main.o
+ .debug_macro   0x0001229c       0x12 ./src/main.o
+ .debug_macro   0x000122ae       0x46 ./src/main.o
+ .debug_macro   0x000122f4       0x17 ./src/main.o
+ .debug_macro   0x0001230b       0x10 ./src/main.o
+ .debug_macro   0x0001231b       0x16 ./src/main.o

@@ -33,7 +33,6 @@ system/src/diag \
 system/src/cortexm \
 system/src/cmsis \
 src \
-src/Drivers \
 src/Drivers/i2c \
 src/Drivers/gpio \
 src/Drivers/LCD \

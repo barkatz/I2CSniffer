@@ -7,7 +7,6 @@
 
 
 #include "stm32f2xx.h"
-#include "Drivers/port.h"
 #include "Drivers/gpio/gpio.hpp"
 
 /*
