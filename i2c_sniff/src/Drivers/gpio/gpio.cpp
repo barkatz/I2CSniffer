@@ -72,6 +72,20 @@ void init_gpio_port_interrupts_and_connect_to_nvic(uint8_t port, uint8_t pin, EX
 }
 
 
+void init_port(uint32_t GPIO_Port, uint32_t GPIO_Pin, GPIOSpeed_TypeDef GPIO_Speed,
+		GPIOMode_TypeDef GPIO_Mode, GPIOOType_TypeDef GPIO_OType, GPIOPuPd_TypeDef GPIO_PuPd) {
+	GPIO_InitTypeDef 		m_GPIO_InitStructure;
 
+	// Turn on the clock for the port
+	RCC_AHB1PeriphClockCmd(PORT_RCC_MASKx(GPIO_Port), ENABLE);
+
+	// Configure pin in output push/pull mode
+	m_GPIO_InitStructure.GPIO_Pin 			= PORT_PIN_MASK(GPIO_Pin);
+	m_GPIO_InitStructure.GPIO_Speed 		= GPIO_Speed;
+	m_GPIO_InitStructure.GPIO_Mode 			= GPIO_Mode;
+	m_GPIO_InitStructure.GPIO_OType 		= GPIO_OType;
+	m_GPIO_InitStructure.GPIO_PuPd 			= GPIO_PuPd;
+	GPIO_Init(PORT_GPIOx(GPIO_Port), &m_GPIO_InitStructure);
+}
 
 

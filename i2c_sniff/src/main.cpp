@@ -35,55 +35,76 @@
  * Enums & Defines
  ***************************************************/
 enum FLIP_STATE {
-	MATCH_PREFIX,
-	READ_WRITE_BIT,
-	ACK_ADDRESS_BIT,
-	READ_BYTE,
-	READ_BYTE_ACK,
-	WRITE_BYTE,
-	WRITE_BYTE_ACK,
-	WRITE_BYTE_UNK
+	MATCH_ADDRES, 		// Match 7 address bits
+	READ_WRITE_BIT,		// Get read/write bit
+	ACK_ADDRESS_BIT,	// Get Ack bit
+
+	READ_BYTE,			// Master reads 8 bits of data (We are sending)
+	READ_BYTE_ACK,		// Read 1 bit of ack/nack from master (We are receiving)
+
+	WRITE_BYTE,			// Master writes 8 bits of data (We are receiving)
+	WRITE_BYTE_ACK,		// We write ack (Actually the real slave does ^^)
+	WRITE_BYTE_UNK		// In this state we read the first bit of the next data, or stop bit.
 };
+
+// Maximum size of read/write buffers.
+#define BUFFER_MAX_SIZE 0x200
+
+// Easier macro
+#define READ_SDA() 						read_port(SDA_PORT_IN, SDA_PIN_IN)
+#define READ_SCL() 						read_port(SCL_PORT_IN, SCL_PIN_IN)
+#define WRITE_SDA(val)					write_port(SDA_PORT_OUT, SDA_PIN_OUT, val)
+
+#define CLEAR_PR(pin) 					EXTI->PR = 1 << (pin)
+
+#define CAPTURE_FALLING_EDGE(pin) 	EXTI->RTSR &= ~(1 << (pin)); \
+									EXTI->FTSR |= (1 << (pin))
+
+#define CAPTURE_RISING_EDGE(pin) 	EXTI->FTSR &= ~(1 << (pin)); \
+									EXTI->RTSR |= (1 << (pin))
+
+#define PUSH_PULL_LINE(port,pin)	PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
+									PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_PP << ((uint16_t) pin))
+
+#define OPEN_DRAIN_LINE(port,pin) 	PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
+									PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_OD	<< ((uint16_t) pin))
+
 /********************************************************************************************************
  *  Globals
  *********************************************************************************************************/
-
-InPort sdaPortIn(SDA_PORT_IN, SDA_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
-		GPIO_PuPd_NOPULL);
-
-OutPort sdaPortOut(SDA_PORT_OUT, SDA_PIN_OUT, GPIO_Speed_50MHz, GPIO_OType_OD,
-		GPIO_PuPd_UP);
-
-
-InPort sclPortIn(SCL_PORT_IN, SCL_PIN_IN, GPIO_Speed_50MHz, GPIO_OType_OD,
-		GPIO_PuPd_NOPULL);
-
-
-
-/* This boolean flag used to flag scl_rise event.
- * We sample SDA when SCL falls, and treat it as a data bit.
- * This logic must check if there was an scl rise event before (not if for example, there was a start/end bit).
- */
-//static bool scl_rise = false;
 // The prefix of the address to intercept - Always starts with a start bit
-//BITS address_to_intercept[] = { ONE_BIT, ZERO_BIT, ZERO_BIT }; // for 0xd0
-// For 0xd/0xc --> 0b0000110X
 BITS address_to_intercept[] = { ZERO_BIT, ZERO_BIT, ZERO_BIT, ONE_BIT, ONE_BIT,	ZERO_BIT, ONE_BIT };
 // How many bits already matched.
 uint8_t match_index = 0;
 // State of the state machine that flips.
 FLIP_STATE state;
 
-uint32_t interception_count = 0;
-uint32_t miss_count = 0;
+// Bytes written/read buffers.
+uint32_t bytes_read[BUFFER_MAX_SIZE];
+uint32_t bread 						= 0;
+uint32_t bytes_written[BUFFER_MAX_SIZE];
+uint32_t bwrite 					= 0;
 
-uint32_t reg_index = 0;
-uint8_t regs[] = { 0, 0, 0, 0xc4, 0xff, 0xae, 0xff, 0x6c, // 0x0 	- 	0x7
-		0x01, 0, 0, 0, 0, 0, 0, 0,	  // 0x8 	- 	0xF
-		0, 0, 0, 0, 0, 0, 0, 0,	  // 0x10 	-	0x17
-		0, 0, 0, 0, 0, 0, 0, 0,	  // 0x18 	-	0x1f
-		0, 0, 0, 0, 0, 0, 0, 0,	  // 0x20 	-	0x27
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+// Global counters
+uint32_t interception_count 		= 0;
+uint32_t miss_count 				= 0;
+uint32_t address_nacked 			= 0;
+uint32_t missmatched_prefix 		= 0;
+uint32_t matched_prefix				= 0;
+uint32_t read_address_matches 		= 0;
+uint32_t write_address_matches 		= 0;
+uint32_t write_byte_nacks 			= 0;
+
+unsigned int tt = 0;
+unsigned int vals[][6] = {
+		{0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc}, // 0
+		{0xbb, 0xbb, 0xbb, 0xbb, 0xbb, 0xbb}, // 1
+		{0x01, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa}, // 2
+		//{0xf1, 0x9f, 0xff, 0x85, 0x01}, // 3 -> 86 deg
+		{0x3d, 0x00, 0xb1, 0xff, 0x6f, 0x01}, // 3 -> 86 deg
+		//{0x0, 0x00, 0x0, 0x0, 0x0, 0x01}, // 3 -> 86 deg
+};
+
 
 /********************************************************************************************************
  *  Decl
@@ -92,12 +113,12 @@ uint8_t regs[] = { 0, 0, 0, 0xc4, 0xff, 0xae, 0xff, 0x6c, // 0x0 	- 	0x7
 /*
  * Reads from a port
  */
-bool inline read(uint32_t port, uint8_t pin);
+bool inline read_port(uint32_t port, uint8_t pin);
 
 /*
  * Writes to a port
  */
-void inline write(uint32_t port, uint8_t pin, bool val);
+void inline write_port(uint32_t port, uint8_t pin, bool val);
 
 /*
  * Inits buttons behavior.
@@ -109,14 +130,16 @@ void init_buttons();
  */
 void init_lcd(void);
 
+
+
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
-bool inline read(uint32_t port, uint8_t pin) {
+bool inline read_port(uint32_t port, uint8_t pin) {
 	return (PORT_GPIOx(port)->IDR & PORT_PIN_MASK(pin)) != 0;
 }
 
-void inline write(uint32_t port, uint8_t pin, bool val) {
+void inline write_port(uint32_t port, uint8_t pin, bool val) {
 	if (val != 0) {
 		PORT_GPIOx(port)->BSRRL = (uint16_t) PORT_PIN_MASK(pin);
 	} else {
@@ -151,7 +174,7 @@ void EXTI15_10_IRQHandler(void) {
 	init_lcd();
 }
 
-int c = 0;
+
 /**
  * SDA Interrupt (PC0)
  * This is interrupt is ON only when scanning for the start bit!
@@ -159,54 +182,27 @@ int c = 0;
 void EXTI0_IRQHandler(void) {
 
 	// Read lines
-	bool scl = read(SCL_PORT_IN, SCL_PIN_IN);
-	bool sda = read(SDA_PORT_IN, SDA_PIN_IN);
+	bool scl = READ_SCL();
+	bool sda = READ_SDA();
 
 	if (!sda && scl) {
 		// SDA falls while SCL was high -> start bit.
 		// start looking for a prefix match
 		match_index = 0;
-		state = MATCH_PREFIX;
+		state = MATCH_ADDRES;
 
 		// 1) disable sda interrupt.
 		mask_interrupt(SDA_PIN_IN);
 		// 2) start clock interrupt.
 		unmask_interrupt(SCL_PIN_IN);
-	} /*else if (sda && scl) {
-		// SDA raises while SCL was high -> stop bit.
-		// Don't do anything with SCL until we detect start bit.
-		unmask_interrupt(SCL_PIN_IN);
-	}*/
-
+	}
 	// Clear SDA Interrupt.
-	EXTI->PR = 1 << SDA_PIN_IN;
+	CLEAR_PR(SDA_PIN_IN);
+
 }
 GPIO_TypeDef* GPIOx = PORT_GPIOx(SDA_PORT_OUT);
 
-#define MAX_SIZE 0x200
 
-uint32_t bytes_read[MAX_SIZE];
-uint32_t bread 					= 0;
-
-uint32_t bytes_written[MAX_SIZE];
-uint32_t bwrite 					= 0;
-uint32_t address_nacked 			= 0;
-uint32_t missmatched_prefix 		= 0;
-uint32_t matched_prefix				= 0;
-uint32_t read_address_matches 		= 0;
-uint32_t write_address_matches 		= 0;
-uint32_t write_byte_nacks 			= 0;
-//uint32_t pinpos 	= SDA_PIN_IN;
-
-unsigned int tt = 0;
-unsigned int vals[][6] = {
-		{0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc}, // 0
-		{0xbb, 0xbb, 0xbb, 0xbb, 0xbb, 0xbb}, // 1
-		{0x01, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa}, // 2
-		//{0xf1, 0x9f, 0xff, 0x85, 0x01}, // 3 -> 86 deg
-		{0x3d, 0x00, 0xb1, 0xff, 0x6f, 0x01}, // 3 -> 86 deg
-		//{0x0, 0x00, 0x0, 0x0, 0x0, 0x01}, // 3 -> 86 deg
-};
 void inline scan_start_bit() {
 	// 1) disable SCL interrupt
 	mask_interrupt(SCL_PIN_IN);
@@ -226,15 +222,13 @@ void EXTI2_IRQHandler(void) {
 	static uint32_t 	 read_index = 0;
 	bool stop_bit = false;
 
-
 	// Read lines
-	bool sda = read(SDA_PORT_IN, SDA_PIN_IN);
-	bool scl = read(SCL_PORT_IN, SCL_PIN_IN);
-
+	bool scl = READ_SCL();
+	bool sda = READ_SDA();
 
 	switch (state) {
 	// Are we reading the address
-	case MATCH_PREFIX:
+	case MATCH_ADDRES:
 		if (address_to_intercept[match_index] == (BITS) sda) {
 			match_index++;
 			// in case of a matching bit, check if we have matched the entire address prefix.
@@ -279,9 +273,7 @@ void EXTI2_IRQHandler(void) {
 				// Master wishes to read.
 				// We want to pull sda line to 0/1. For this, we change to capture SCL fall
 				// And we will come back after the ack bit SCL has fallen.
-				EXTI->RTSR &= ~(1 << SCL_PIN_IN);
-				EXTI->FTSR |= (1 << SCL_PIN_IN);
-
+				CAPTURE_FALLING_EDGE(SCL_PIN_IN);
 				state = READ_BYTE;
 			} else {
 				// Sample the byte which is currently being written.
@@ -298,10 +290,7 @@ void EXTI2_IRQHandler(void) {
 		if (bit_count < 8) {
 			// set SDA OUT port to push/pull...
 			if (bit_count == 0) {
-				GPIOx->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) SDA_PIN_OUT));
-				GPIOx->OTYPER |= (uint16_t) (GPIO_OType_PP << ((uint16_t) SDA_PIN_OUT));
-				GPIOx->PUPDR &= ~(GPIO_PUPDR_PUPDR0 << ((uint16_t) SDA_PIN_OUT * 2));
-				GPIOx->PUPDR |= (GPIO_PuPd_UP<< (SDA_PIN_OUT * 2));
+				PUSH_PULL_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
 				if (last_byte_written == 0x3) {
 					byte_to_send = vals[3][read_index++];
 				} else  {
@@ -322,21 +311,20 @@ void EXTI2_IRQHandler(void) {
 				}
 			}
 			// Write the current bit of data
-			write(SDA_PORT_OUT, SDA_PIN_OUT, byte_to_send & (1<<(7-bit_count)) );
+			WRITE_SDA(byte_to_send & (1<<(7-bit_count)));
 			bit_count++;
 		} else {
 			// Finished writing the bits to the master
 			// Change back to capture rising edge of SCL, to capture the ACK bit
-			EXTI->RTSR |= (1 << SCL_PIN_IN);
-			EXTI->FTSR &= ~(1 << SCL_PIN_IN);
+			CAPTURE_RISING_EDGE(SCL_PIN_IN);
 
-//			// Change back sda to open drain.
-			GPIOx->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) SDA_PIN_OUT));
-			GPIOx->OTYPER |= (uint16_t) (GPIO_OType_OD	<< ((uint16_t) SDA_PIN_OUT));
-			/* Pull-up Pull down resistor configuration*/
-			GPIOx->PUPDR &= ~(GPIO_PUPDR_PUPDR0 << ((uint16_t) SDA_PIN_OUT * 2));
-			GPIOx->PUPDR |= (GPIO_PuPd_UP<< (SDA_PIN_OUT * 2));
-			write(SDA_PORT_OUT, SDA_PIN_OUT, 1);
+			// Change back sda to open drain.
+			OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+
+			// Release it...
+			WRITE_SDA(1);
+
+			// Update counters and wait for ack.
 			bread++;
 			state = READ_BYTE_ACK;
 		}
@@ -353,8 +341,7 @@ void EXTI2_IRQHandler(void) {
 			// Master wishes to read.
 			// We want to pull sda line to 0/1. For this, we change to capture SCL fall
 			// And we will come back after the ack bit SCL has fallen.
-			EXTI->RTSR &= ~(1 << SCL_PIN_IN);
-			EXTI->FTSR |= (1 << SCL_PIN_IN);
+			CAPTURE_FALLING_EDGE(SCL_PIN_IN);
 			state = READ_BYTE;
 		}
 		break;
@@ -365,7 +352,7 @@ void EXTI2_IRQHandler(void) {
 		byte_to_recv = (byte_to_recv << 1) | sda;
 		if (bit_count == 8) {
 			// Save the byte
-			bytes_written[bwrite % MAX_SIZE] = byte_to_recv;
+			bytes_written[bwrite % BUFFER_MAX_SIZE] = byte_to_recv;
 			last_byte_written = byte_to_recv;
 			bwrite++;
 			state = WRITE_BYTE_ACK;
@@ -392,11 +379,11 @@ void EXTI2_IRQHandler(void) {
 
 			// check if sda is changing while scl is still high...
 			do {
-				if (sda != read(SDA_PORT_IN, SDA_PIN_IN)) {
+				if (sda != READ_SDA()) {
 					// This means stop bit
 					stop_bit = true;
 				}
-				scl = read(SCL_PORT_IN, SCL_PIN_IN);
+				scl = READ_SCL();
 			} while (scl && !stop_bit);
 
 			// if it was a stop bit, start scanning for start bit.
@@ -411,7 +398,8 @@ void EXTI2_IRQHandler(void) {
 			}
 		break;
 	} /* switch (state) */
-	EXTI->PR = 1 << SCL_PIN_IN;
+	CLEAR_PR(SCL_PIN_IN);
+
 }
 #ifdef __cplusplus
 }
@@ -419,15 +407,19 @@ void EXTI2_IRQHandler(void) {
 
 int main(int argc, char* argv[]) {
 	// Sda port is pulled up. Let it go floating.
-	sdaPortOut.write(1);
 	init_lcd();
 	init_buttons();
 
 	/*
-	 * Set up interrupts.
+	 * Set up interrupts and gpios.
+	 * Set output port as pullup and write '1' (release)
 	 * Catch falling edge of SDA (START BIT)
 	 * Catch rising edge of SCL (DATA BIT)
 	 */
+	init_port(SDA_PORT_OUT, SDA_PIN_OUT, GPIO_Speed_50MHz, GPIO_Mode_OUT, GPIO_OType_OD, GPIO_PuPd_UP);
+	WRITE_SDA(1);
+
+
 	init_gpio_port_interrupts_and_connect_to_nvic(SDA_PORT_IN, SDA_PIN_IN,	EXTI_Trigger_Falling);
 	init_gpio_port_interrupts_and_connect_to_nvic(SCL_PORT_IN, SCL_PIN_IN,	EXTI_Trigger_Rising);
 	// Start looking for start bit.
