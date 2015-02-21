@@ -65,11 +65,11 @@
 #ifdef __GNUC__
 /* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
    set to 'Yes') calls __io_putchar() */
-//a#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+//#define PUTCHAR_PROTOTYPE5 int __io_putchar(int ch)
 //#else
-//#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-//#define PUTCHAR_PROTOTYPE int putc(int ch,  FILE *f)
-//#define PUTCHAR_PROTOTYPE int __swbuf_r(struct _reent *, int ch,  FILE *f)
+#define PUTCHAR_PROTOTYPE4 int fputc(int ch, FILE *f)
+#define PUTCHAR_PROTOTYPE3 int putc(int ch,  FILE *f)
+#define PUTCHAR_PROTOTYPE2 int __swbuf_r(struct _reent *, int ch,  FILE *f)
 #define PUTCHAR_PROTOTYPE int puts (const char* s)
 
 #endif /* __GNUC__ */
@@ -99,6 +99,8 @@ typedef struct _LCD_LOG_line
   * @}
   */ 
 
+extern char lcd_temp_buf[0x100];
+
 /** @defgroup LCD_LOG_Exported_Macros
   * @{
   */ 
@@ -115,13 +117,15 @@ typedef struct _LCD_LOG_line
                             printf(__VA_ARGS__);\
                             LCD_LineColor = LCD_LOG_DEFAULT_COLOR
 
-extern char lcd_temp_buf[0x100];
-extern int lcd_line_counter;
-extern int temp_offset;
-#define  LCD_BarLog(...)    LCD_LineColor = LCD_LOG_DEFAULT_COLOR;\
-							temp_offset = snprintf(lcd_temp_buf, sizeof(lcd_temp_buf), "%d) ", lcd_line_counter++);\
-							snprintf(lcd_temp_buf+temp_offset, sizeof(lcd_temp_buf) - temp_offset, __VA_ARGS__);\
-                            puts(lcd_temp_buf);
+#define  LCD_BarLog(color, ...)    	LCD_LineColor = color;\
+									snprintf(lcd_temp_buf, sizeof(lcd_temp_buf), __VA_ARGS__);\
+									puts(lcd_temp_buf); \
+									LCD_LineColor = LCD_LOG_DEFAULT_COLOR;\
+
+#define  LCD_BarLogWithLines(...)    LCD_LineColor = LCD_LOG_DEFAULT_COLOR;\
+									temp_offset = snprintf(lcd_temp_buf, sizeof(lcd_temp_buf), "%d) ", lcd_line_counter++);\
+									snprintf(lcd_temp_buf+temp_offset, sizeof(lcd_temp_buf) - temp_offset, __VA_ARGS__);\
+									puts(lcd_temp_buf);
 
 #define  LCD_SimpleLog(buf)  LCD_LineColor = LCD_LOG_DEFAULT_COLOR;\
 							 puts(buf);\
@@ -144,9 +148,11 @@ extern uint16_t LCD_LineColor;
   */ 
 void LCD_LOG_Init(void);
 void LCD_LOG_DeInit(void);
-void LCD_LOG_SetHeader(uint8_t *Title);
+//void LCD_LOG_SetHeader(uint8_t *Title);
+void LCD_LOG_SetHeader(uint8_t *Title, uint16_t background, uint16_t forground);
 void LCD_LOG_SetFooter(uint8_t *Status);
 void LCD_LOG_ClearTextZone(void);
+void LCD_LOG_SetLine(uint16_t line);
 #ifdef LCD_SCROLL_ENABLED
  ErrorStatus LCD_LOG_ScrollBack(void);
  ErrorStatus LCD_LOG_ScrollForward(void);

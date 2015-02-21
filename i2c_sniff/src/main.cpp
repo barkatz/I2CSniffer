@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <vector>
 #include <string.h>
@@ -5,6 +6,7 @@
 #include <assert.h>
 #include "lcd_log.h"
 //#include "Drivers\port.h"
+#include "Drivers/timer/timer.hpp"
 #include "Drivers/gpio/gpio.hpp"
 #include "utils.hpp"
 #include "stm32f2xx.h"
@@ -43,7 +45,9 @@ enum FLIP_STATE {
 
 	WRITE_BYTE,			// Master writes 8 bits of data (We are receiving)
 	WRITE_BYTE_ACK,		// We write ack (Actually the real slave does ^^)
-	WRITE_BYTE_UNK		// In this state we read the first bit of the next data, or stop bit.
+	WRITE_BYTE_UNK,		// In this state we read the first bit of the next data, or stop bit.
+
+	DISABLED			// Disabled...
 };
 
 // Maximum size of read/write buffers.
@@ -72,9 +76,10 @@ enum FLIP_STATE {
  *  Globals
  *********************************************************************************************************/
 // The prefix of the address to intercept - Always starts with a start bit
-BITS address_to_intercept[] = { ZERO_BIT, ZERO_BIT, ZERO_BIT, ONE_BIT, ONE_BIT,	ZERO_BIT, ONE_BIT };
+//BITS address_to_intercept[] = { ZERO_BIT, ZERO_BIT, ZERO_BIT, ONE_BIT, ONE_BIT,	ZERO_BIT, ONE_BIT };
+uint8_t address_to_intercept 	= 0x1a;
 // How many bits already matched.
-uint8_t match_index = 0;
+uint8_t match_index 			= 0;
 // State of the state machine that flips.
 FLIP_STATE state;
 
@@ -85,23 +90,26 @@ uint32_t bytes_written[BUFFER_MAX_SIZE];
 uint32_t bwrite 					= 0;
 
 // Global counters
-uint32_t interception_count 		= 0;
-uint32_t miss_count 				= 0;
-uint32_t address_nacked 			= 0;
-uint32_t missmatched_prefix 		= 0;
 uint32_t matched_prefix				= 0;
+uint32_t missmatched_prefix 		= 0;
+uint32_t address_nacked 			= 0;
 uint32_t read_address_matches 		= 0;
 uint32_t write_address_matches 		= 0;
 uint32_t write_byte_nacks 			= 0;
+
 
 unsigned int tt = 0;
 unsigned int vals[][6] = {
 		{0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc}, // 0
 		{0xbb, 0xbb, 0xbb, 0xbb, 0xbb, 0xbb}, // 1
 		{0x01, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa}, // 2
-		//{0xf1, 0x9f, 0xff, 0x85, 0x01}, // 3 -> 86 deg
-		{0x3d, 0x00, 0xb1, 0xff, 0x6f, 0x01}, // 3 -> 86 deg
-		//{0x0, 0x00, 0x0, 0x0, 0x0, 0x01}, // 3 -> 86 deg
+//		{0xf1, 0x9f, 0xff, 0x85,0x85, 0x01},	  // 3 -> 86 deg (NOT REL)
+//		{0x3d, 0x00, 0xb1, 0xff, 0x6f, 0x01}, // 3 -> 250 deg
+//		{0x0, 0x00, 0x0, 0x0, 0x0, 0x01}, // 3 -> 86 deg
+		//{0x70, 0x00, 0x10, 0x0, 0x42, 0x01}, // 3 -> 86 deg
+//		{0xff, 0xff, 0xff, 0xff, 0xff, 0x01}, //
+//		{0x10, 0x00, 0x94, 0xff, 0xc5, 0x01}, //53 deg
+		{0x4c, 0x00, 0xc6, 0xff, 0x5a, 0x01}, //350 deg
 };
 
 
@@ -150,7 +158,7 @@ void init_lcd(void) {
 	// Init lcd log.
 	STM322xG_LCD_Init();
 	LCD_LOG_Init();
-	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer");
+	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-ON-)", LCD_COLOR_BLUE, LCD_COLOR_WHITE);
 }
 
 void init_buttons() {
@@ -165,12 +173,40 @@ void init_buttons() {
 extern "C" {
 #endif
 /*
- *  Button handler (KEY button is IRQ-15)
- *  This prints the buffer of the sniffed I2C msgs to the screen.
+ * Button handler (KEY button is IRQ-15)
+ * Enable or disable interception
  */
 void EXTI15_10_IRQHandler(void) {
+
+	if (state == DISABLED) {
+		// Start from matching address state.
+		state = MATCH_ADDRES;
+		match_index = 0;
+		// Make sure interrupts are in the right direction (don't know which state we left).
+		CAPTURE_RISING_EDGE(SCL_PIN_IN);
+		CAPTURE_FALLING_EDGE(SDA_PIN_IN);
+
+		// Start looking for start bit.
+		unmask_interrupt(SDA_PIN_IN);
+
+		LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-ON-)", LCD_COLOR_BLUE, LCD_COLOR_WHITE);
+
+	} else {
+		// Stop interrupts.
+		mask_interrupt(SDA_PIN_IN);
+		mask_interrupt(SCL_PIN_IN);
+
+		// Change state to disabled
+		state = DISABLED;
+
+		// Make sure SDA is not pulled up
+		OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+		WRITE_SDA(1);
+		LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-OFF-)", LCD_COLOR_GREY, LCD_COLOR_RED);
+	}
+	// Clear interrupt.
 	EXTI_ClearFlag(EXTI_Line15);
-	init_lcd();
+
 }
 
 
@@ -213,6 +249,7 @@ void inline scan_start_bit() {
  * SCL Interrupt (PA2)
  */
 void EXTI2_IRQHandler(void) {
+	int sa;
 	static volatile uint8_t 	bit_count 			= 0; 		// Bit count for receiving/xmiting a byte
 	static volatile uint32_t 	byte_to_recv 		= 0; 		// a temp byte to receive.
 	static bool 				is_read 			= 0;		// a flag to indiciate whether master is reading/writing
@@ -226,12 +263,18 @@ void EXTI2_IRQHandler(void) {
 	bool sda = READ_SDA();
 
 	switch (state) {
+	case DISABLED:
+		// Do nothing...
+		break;
 	// Are we reading the address
 	case MATCH_ADDRES:
-		if (address_to_intercept[match_index] == (BITS) sda) {
+		// match the next address bit.
+		sa = 7-match_index;
+		if ((address_to_intercept & (1<<sa)) == sda<<sa) {
+//		if (address_to_intercept[match_index] == sda) {
 			match_index++;
 			// in case of a matching bit, check if we have matched the entire address prefix.
-			if (match_index == sizeof(address_to_intercept)) {
+			if (match_index == 7) {
 				// Address captured, move on to capturing read/write
 				state = READ_WRITE_BIT;
 				matched_prefix++;
@@ -298,15 +341,6 @@ void EXTI2_IRQHandler(void) {
 				if (read_index >5) {
 					read_index = 0;
 					byte_to_send = 0x1;
-					vals[3][tt] = vals[3][tt] + 1;
-					while (vals[3][tt] == 0xff) {
-						tt = (tt + 1) % 4;
-					}
-					vals[3][tt]++;
-					for (unsigned int i=0; i<tt ; i++) {
-						vals[3][i] = 0;
-					}
-					tt = 0;
 				}
 			}
 			// Write the current bit of data
@@ -404,8 +438,52 @@ void EXTI2_IRQHandler(void) {
 }
 #endif
 
+void print_stat(uint16_t line_num, uint16_t color, const char* fmt, uint32_t cur_counter, uint32_t prev_counter) {
+	uint16_t c;
+	// Clear line
+	LCD_ClearLine((uint16_t) ((line_num + YWINDOW_MIN) * 24));
+	// Set line
+	LCD_LOG_SetLine(line_num);
+
+	// If changed, change color.
+	if (cur_counter == prev_counter) {
+		c = LCD_COLOR_WHITE;
+	} else {
+		c = color;
+	}
+	LCD_BarLog(c, fmt, (unsigned int) cur_counter);
+}
+void update_lcd_stats() {
+	uint16_t color;
+	// Global counters
+	static uint32_t prev_matched_prefix				= 0;
+	static uint32_t prev_missmatched_prefix 		= 0;
+	static uint32_t prev_address_nacked 			= 0;
+	static uint32_t prev_read_address_matches 		= 0;
+	static uint32_t prev_write_address_matches 		= 0;
+	static uint32_t prev_write_byte_nacks 			= 0;
+
+	// Not sure why we needc this - check this out later (if we drop this lines appear at bottom as well.)
+	LCD_LOG_DeInit();
+	print_stat((uint16_t) 0, LCD_COLOR_GREEN, 	"    <<<TARGET ADDRESS 0x%08x>>>\n", address_to_intercept, address_to_intercept);
+	print_stat((uint16_t) 1, LCD_COLOR_GREEN, 	"Matched prefixes          = 0x%08x\n", matched_prefix, prev_matched_prefix);
+	print_stat((uint16_t) 1, LCD_COLOR_GREEN, 	"Matched prefixes          = 0x%08x\n", matched_prefix, prev_matched_prefix);
+	print_stat((uint16_t) 2, LCD_COLOR_RED, 	"Missmatched prefix        = 0x%08x\n", missmatched_prefix, prev_missmatched_prefix);
+	print_stat((uint16_t) 3, LCD_COLOR_RED, 	"Nacked addresses          = 0x%08x\n", address_nacked, prev_address_nacked);
+	print_stat((uint16_t) 4, LCD_COLOR_MAGENTA, "Read addresses            = 0x%08x\n", read_address_matches, prev_read_address_matches);
+	print_stat((uint16_t) 5, LCD_COLOR_CYAN, 	"Write addresses           = 0x%08x\n", write_address_matches, prev_write_address_matches);
+	print_stat((uint16_t) 6, LCD_COLOR_RED, 	"Write nacks               = 0x%08x\n", write_byte_nacks, prev_write_byte_nacks);
+
+	// Update counters
+	prev_write_byte_nacks		= write_byte_nacks;
+	prev_read_address_matches 	= read_address_matches;
+	prev_write_address_matches 	= write_address_matches;
+	prev_address_nacked 	 	= address_nacked;
+	prev_matched_prefix		 	= matched_prefix;
+	prev_missmatched_prefix	 	= missmatched_prefix;
+}
+
 int main(int argc, char* argv[]) {
-	// Sda port is pulled up. Let it go floating.
 	init_lcd();
 	init_buttons();
 
@@ -424,7 +502,12 @@ int main(int argc, char* argv[]) {
 	// Start looking for start bit.
 	unmask_interrupt(SDA_PIN_IN);
 
-	while (1) {	}
+	Timer t;
+	t.start();
+	while (1) {
+		t.sleep(2000);
+		update_lcd_stats();
+	}
 
 }
 
