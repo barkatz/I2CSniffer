@@ -38,6 +38,15 @@
 #define SCL_PORT_IN		0
 #define SCL_PIN_IN		2
 
+// PC.10 (CN4/36) --> Uart Tx port
+#define UARTX_PORT_TX		2
+#define UARTX_PIN_TX		10
+
+// PC.11 (CN4/35) --> Uart Rx port
+#define UARTX_PORT_RX		2
+#define UARTX_PIN_RX		11
+
+
 
 #define PORT_RCC_MASKx(_N)            	 (RCC_AHB1Periph_GPIOA << (_N))
 #define PORT_PIN_MASK(_N)             	 (1 << (_N))

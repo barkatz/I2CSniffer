@@ -8,6 +8,7 @@
 //#include "Drivers\port.h"
 #include "Drivers/timer/timer.hpp"
 #include "Drivers/gpio/gpio.hpp"
+#include "Drivers/usart/usart.hpp"
 #include "utils.hpp"
 #include "stm32f2xx.h"
 
@@ -109,7 +110,8 @@ unsigned int vals[][6] = {
 		//{0x70, 0x00, 0x10, 0x0, 0x42, 0x01}, // 3 -> 86 deg
 //		{0xff, 0xff, 0xff, 0xff, 0xff, 0x01}, //
 //		{0x10, 0x00, 0x94, 0xff, 0xc5, 0x01}, //53 deg
-		{0x4c, 0x00, 0xc6, 0xff, 0x5a, 0x01}, //350 deg
+//		{0x4c, 0x00, 0xc6, 0xff, 0x5a, 0x01}, //350 deg
+		{0x5c, 0x00, 0xf6, 0xff, 0x40, 0x01}, //350 deg
 };
 
 
@@ -340,6 +342,9 @@ void EXTI2_IRQHandler(void) {
 				}
 				if (read_index >5) {
 					read_index = 0;
+					vals[3][0]++;
+					vals[3][2]++;
+					vals[3][4]++;
 					byte_to_send = 0x1;
 				}
 			}
@@ -453,6 +458,7 @@ void print_stat(uint16_t line_num, uint16_t color, const char* fmt, uint32_t cur
 	}
 	LCD_BarLog(c, fmt, (unsigned int) cur_counter);
 }
+
 void update_lcd_stats() {
 	uint16_t color;
 	// Global counters
@@ -500,12 +506,14 @@ int main(int argc, char* argv[]) {
 	init_gpio_port_interrupts_and_connect_to_nvic(SDA_PORT_IN, SDA_PIN_IN,	EXTI_Trigger_Falling);
 	init_gpio_port_interrupts_and_connect_to_nvic(SCL_PORT_IN, SCL_PIN_IN,	EXTI_Trigger_Rising);
 	// Start looking for start bit.
+	init_usart(9600);
 	unmask_interrupt(SDA_PIN_IN);
+
 
 	Timer t;
 	t.start();
 	while (1) {
-		t.sleep(2000);
+		t.sleep(1000);
 		update_lcd_stats();
 	}
 
