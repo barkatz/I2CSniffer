@@ -21,10 +21,14 @@ send [command]
 	] 		- stop bit
 	0xXX 	- the expected byte
 	* 		- Overwrite the byte with a value
+	
 	Examples:
 	[0x26 0x10 *0x30] 
 	The i2c module will wait for a start bit, 0x26(Read from 0x26), then a 0x10. the following byte that the slave will be overwritten with 0x30.
-Then the i2c module will expect a stop bit. After a stop bit iwll be matched, the i2c module will start searching for the same sequnce again.
+	Then the i2c module will expect a stop bit. After a stop bit iwll be matched, the i2c module will start searching for the same sequnce again.
+
+	Note:
+	The sequence MUST start with a start bit ([)
 
 		"""
 		self.s.write(command + '\n')

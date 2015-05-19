@@ -38,7 +38,7 @@
  ***************************************************/
 
 enum FLIP_STATE {
-	MATCH_ADDRES, 		// Match 7 address bits
+	MATCH_ADDRESS, 		// Match 7 address bits
 	ACK_ADDRESS_BIT,	// Get Ack bit
 
 	READ_BYTE,			// Master reads 8 bits of data (We are sending)
@@ -199,9 +199,14 @@ void init_buttons() {
 
 void enable() {
 	// Start from matching address state.
-	state = MATCH_ADDRES;
+	state = MATCH_ADDRESS;
+
+	// Start matching the first byte in the sequence.
 	i2c_byte_list_curr = i2c_byte_list_head;
+
 	// Make sure interrupts are in the right direction (don't know which state we left).
+	// -> Capture SDA FALL  -> Start bits
+	// -> Capture SCL RAISE -> Normal bits
 	CAPTURE_RISING_EDGE(SCL_PIN_IN);
 	CAPTURE_FALLING_EDGE(SDA_PIN_IN);
 
@@ -299,86 +304,11 @@ bool match_stop_bit() {
 	return false;
 }
 
-//void init_i2c_byte_list() {
-//	i2c_byte_list_curr = i2c_byte_list_head = NULL;
-//
-//	/*
-//	 * Test sequence to match:
-//	 * [ 0x1A 0x3 ] [ 0x1B *0xaa *0xbb *0xcc *0xdd *0xee *0xff
-//	 */
-//
-//	i2c_byte_list_head = (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr = i2c_byte_list_head;
-//
-//	// Match [
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_START;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//
-//	// Match 0x1a
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_BYTE;
-//	i2c_byte_list_curr->value 	= 0x1a;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Match 0x3
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_BYTE;
-//	i2c_byte_list_curr->value 	= 0x3;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Match ]
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_STOP;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Match [
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_START;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Match 0x1b
-//	i2c_byte_list_curr->op 		= OP_MATCH;
-//	i2c_byte_list_curr->type 	= TYPE_BYTE;
-//	i2c_byte_list_curr->value 	= 0x1b;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr->actual_value = 0;
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Overwrite 0xaa
-//	i2c_byte_list_curr->op 		= OP_OVERRIDE;
-//	i2c_byte_list_curr->type 	= TYPE_BYTE;
-//	i2c_byte_list_curr->value 	= 0x1;
-////	i2c_byte_list_curr->next 	= NULL;
-//	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-//	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-//
-//	// Overwrite 0xbb
-//	i2c_byte_list_curr->op 		= OP_OVERRIDE;
-//	i2c_byte_list_curr->type 	= TYPE_BYTE;
-//	i2c_byte_list_curr->value 	= 0x2;
-//	i2c_byte_list_curr->next 	= NULL;
-////	i2c_byte_list_curr->next 	= (i2c_byte*) malloc(sizeof(i2c_byte));
-////	i2c_byte_list_curr 			= i2c_byte_list_curr->next;
-////
-////	// Overwrite 0xcc
-////	i2c_byte_list_curr->op 		= OP_OVERRIDE;
-////	i2c_byte_list_curr->type 	= TYPE_BYTE;
-////	i2c_byte_list_curr->value 	= 0xcc;
-////	i2c_byte_list_curr->next 	= NULL;
-//
-//}
+/*
+ * Test sequence to match:
+ * [ 0x1A 0x3 ] [ 0x1B *0xaa *0xbb *0xcc *0xdd *0xee *0xff
+ */
+
 /**
  * Interrupts must be defined extern!
  */
@@ -422,11 +352,12 @@ void EXTI0_IRQHandler(void) {
 			return;
 		}
 		// Move on.
-		state = MATCH_ADDRES;
+		state = MATCH_ADDRESS;
 
 		// 1) disable sda interrupt.
 		mask_interrupt(SDA_PIN_IN);
-		// 2) start clock interrupt.
+		// 2) start clock interrupt - capture rising edge
+		CAPTURE_RISING_EDGE(SCL_PIN_IN);
 		unmask_interrupt(SCL_PIN_IN);
 	}
 	// Clear SDA Interrupt.
@@ -440,8 +371,15 @@ void inline scan_start_bit() {
 	// 1) disable SCL interrupt
 	mask_interrupt(SCL_PIN_IN);
 	// 2) enable SDA interrupt (searching for start bit)
+	CAPTURE_FALLING_EDGE(SDA_PIN_IN);
 	unmask_interrupt(SDA_PIN_IN);
 }
+
+bool bla_sda;
+bool bla_scl;
+
+bool bla_sda2;
+bool bla_scl2;
 
 /*
  * SCL Interrupt (PA2)
@@ -460,7 +398,7 @@ void EXTI2_IRQHandler(void) {
 		break;
 
 	// Are we reading the address
-	case MATCH_ADDRES:
+	case MATCH_ADDRESS:
 		// Read the address to the current i2c_byte.
 		i2c_byte_list_curr->actual_value <<= 1;
 		i2c_byte_list_curr->actual_value |= sda;
@@ -473,6 +411,7 @@ void EXTI2_IRQHandler(void) {
 	case ACK_ADDRESS_BIT:
 		// Is it read or write address?
 		is_read = i2c_byte_list_curr->actual_value & 1;
+
 		// Check if the current actual_value matches the value expected...
 		if (!match_i2c_byte()){
 			// Nope, start again.
@@ -503,6 +442,23 @@ void EXTI2_IRQHandler(void) {
 		break;
 
 	case READ_BYTE:
+		// If we are overriding the byte (answering instead of the slave).
+		if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			// set SDA OUT port to push/pull on the first bit
+			// This can be done now since SCL is low.
+			if (bit_count == 0) {
+				PUSH_PULL_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+			}
+			// Write the current bit of data
+			WRITE_SDA(i2c_byte_list_curr->value & (1<<(7-bit_count)));
+		} else {
+			// Not answering instead of the slave. just pack the bits
+			i2c_byte_list_curr->actual_value <<= 1;
+			i2c_byte_list_curr->actual_value |= sda;
+		}
+
+		bit_count++;
+
 		// Finished the byte....
 		if (bit_count == 8) {
 			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
@@ -519,24 +475,6 @@ void EXTI2_IRQHandler(void) {
 			// Update counters and wait for ack.
 			bread++;
 			state = READ_BYTE_ACK;
-		} else {
-
-			// If we are overriding the byte (answering instead of the slave).
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
-				// set SDA OUT port to push/pull on the first bit
-				// This can be done now since SCL is low.
-				if (bit_count == 0) {
-					PUSH_PULL_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
-				}
-				// Write the current bit of data
-				WRITE_SDA(i2c_byte_list_curr->value & (1<<(7-bit_count)));
-			} else {
-				// Not answering instead of the slave. just pack the bits
-				i2c_byte_list_curr->actual_value <<= 1;
-				i2c_byte_list_curr->actual_value |= sda;
-			}
-
-			bit_count++;
 		}
 		break; /* READ_BYTE */
 
@@ -568,39 +506,38 @@ void EXTI2_IRQHandler(void) {
 		break;
 
 	case WRITE_BYTE:
+		// If we are overriding the byte (replacing the master request...).
+		if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			// set SDA OUT port to push/pull on the first bit
+			// This can be done now since SCL is low.
+			if (bit_count == 0) {
+				PUSH_PULL_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+			}
+			// Write the current bit of data
+			WRITE_SDA(i2c_byte_list_curr->value & (1<<(7-bit_count)));
+		} else {
+			// Not answering instead of the slave. just pack the bits
+			i2c_byte_list_curr->actual_value <<= 1;
+			i2c_byte_list_curr->actual_value |= sda;
+		}
+		// One less bit to go...
+		bit_count++;
+
 		// Finished the byte....
 		if (bit_count == 8) {
 			// Finished writing the bits to the master
 			// Change back to capture rising edge of SCL, to capture the ACK bit
-//			CAPTURE_RISING_EDGE(SCL_PIN_IN);
+			//CAPTURE_RISING_EDGE(SCL_PIN_IN);
 			// Change back sda to open drain.
-//			OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+			//OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
 
 			// Release it...
-//			WRITE_SDA(1);
+			//WRITE_SDA(1);
 
 			// Update counters and wait for ack.
 			bwrite++;
 			state = WRITE_BYTE_ACK;
-		} else {
-		// If we are overriding the byte (replacing the master request...).
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
-				// set SDA OUT port to push/pull on the first bit
-				// This can be done now since SCL is low.
-				if (bit_count == 0) {
-					PUSH_PULL_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
-				}
-				// Write the current bit of data
-				WRITE_SDA(i2c_byte_list_curr->value & (1<<(7-bit_count)));
-			} else {
-				// Not answering instead of the slave. just pack the bits
-				i2c_byte_list_curr->actual_value <<= 1;
-				i2c_byte_list_curr->actual_value |= sda;
-			}
-
-			bit_count++;
 		}
-
 
 		break;
 
@@ -630,6 +567,8 @@ void EXTI2_IRQHandler(void) {
 			// We captured SCL rise, this might be the next data bit or a stop bit.
 			// The easiest way to check this is with a loop....
 			mask_interrupt(SCL_PIN_IN);
+			bla_scl = scl;
+			bla_sda = sda;
 
 			// check if sda is changing while scl is still high...
 			do {
@@ -639,6 +578,8 @@ void EXTI2_IRQHandler(void) {
 				}
 				scl = READ_SCL();
 			} while (scl && !stop_bit);
+			bla_scl2 = READ_SCL();
+			bla_sda2 = READ_SDA();
 
 			// if it was a stop bit, start scanning for start bit.
 			if (stop_bit) {
@@ -646,7 +587,7 @@ void EXTI2_IRQHandler(void) {
 				stop_bit_count++;
 				scan_start_bit();
 			} else {
-				// if it wasn't a stop bit, it was bit 1 of the next byte
+				// if it wasn't a stop bit, it was bit 0 of the next byte
 				bit_count = 1;
 				i2c_byte_list_curr->actual_value = sda;
 				state = WRITE_BYTE;
@@ -702,6 +643,10 @@ void update_lcd_stats() {
 }
 
 
+/*
+ * Reads a complete uart command into cmd.
+ * Returns true/false if there was a command in queue.
+ */
 size_t read_uart_command(uint8_t* cmd){
 	size_t i = 0;
 	uint8_t 	 b;
@@ -727,6 +672,9 @@ size_t read_uart_command(uint8_t* cmd){
 	}
 }
 
+/*
+ * Free's a sequence list of bytes to trace
+ */
 void free_list(i2c_byte* list) {
 	i2c_byte *cur, *next;
 	cur = list;
@@ -739,6 +687,16 @@ void free_list(i2c_byte* list) {
 	}
 }
 
+/*
+ * Handles a cmd.
+ * The cmd is a byte sequence to match on the i2c bus:
+ * An example would be:
+ * [ 0x26 3] [0x27 *0x30 ? 0x30
+ * [ ] 		--> Start/Stop bits
+ * 0x26 	--> Byte to match
+ * *0x30 	--> Byte to overwrite
+ * ? 		--> Don't care byte
+ */
 void handle_command(char* cmd, size_t size) {
 	char delim[] = " \t";
 	char* tok = strtok(cmd, delim);
@@ -809,17 +767,17 @@ void handle_command(char* cmd, size_t size) {
 		} else {
 			i2c_byte_list_curr->next 	= NULL;
 		}
-
 		i2c_byte_list_curr 	= i2c_byte_list_curr->next;
-
-
 	}
+
+	// Start matching from the curr ptr...
+	i2c_byte_list_curr = i2c_byte_list_head;
 }
 
 int main(int argc, char* argv[]) {
 	init_lcd();
 	init_buttons();
-	//init_i2c_byte_list();
+
 
 	/*
 	 * Set up interrupts and gpios.
@@ -832,8 +790,11 @@ int main(int argc, char* argv[]) {
 	init_gpio_port_interrupts_and_connect_to_nvic(SDA_PORT_IN, SDA_PIN_IN,	EXTI_Trigger_Falling);
 	init_gpio_port_interrupts_and_connect_to_nvic(SCL_PORT_IN, SCL_PIN_IN,	EXTI_Trigger_Rising);
 	init_usart(baudrate);
+
 	// Start looking for start bit.
-//	unmask_interrupt(SDA_PIN_IN);
+	// unmask_interrupt(SDA_PIN_IN);
+	// Start disabled.
+	disable();
 
 
 	uint8_t cmd[0x100];
