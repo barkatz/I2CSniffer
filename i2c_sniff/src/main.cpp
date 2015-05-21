@@ -43,6 +43,7 @@ enum FLIP_STATE {
 
 	READ_BYTE,			// Master reads 8 bits of data (We are sending)
 	READ_BYTE_ACK,		// Read 1 bit of ack/nack from master (We are receiving)
+	XMIT_BYTE_DONE, 	// After the last bit is xmitted we need to change back to capture SCL clock rise
 
 	WRITE_BYTE,			// Master writes 8 bits of data (We are receiving)
 	WRITE_BYTE_ACK,		// We write ack (Actually the real slave does ^^)
@@ -462,21 +463,29 @@ void EXTI2_IRQHandler(void) {
 		// Finished the byte....
 		if (bit_count == 8) {
 			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
-				// Finished writing the bits to the master
-				// Change back to capture rising edge of SCL, to capture the ACK bit
-				CAPTURE_RISING_EDGE(SCL_PIN_IN);
-				// Change back sda to open drain.
-				OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
-
-				// Release it...
-				WRITE_SDA(1);
+				// We are now xmitting the last bit, we'll need to change scl capture direction and realese SDA as soon
+				// as we are done
+				state = XMIT_BYTE_DONE;
+			} else {
+				// We are done with this byte -> Wait for the ack
+				state = READ_BYTE_ACK;
 			}
-
-			// Update counters and wait for ack.
-			bread++;
-			state = READ_BYTE_ACK;
 		}
+		// Update counters and wait for ack.
+		bread++;
 		break; /* READ_BYTE */
+
+	case XMIT_BYTE_DONE:
+		// Finished xmitting the last bit
+		// Change back to capture rising edge of SCL, to capture the ACK bit
+		CAPTURE_RISING_EDGE(SCL_PIN_IN);
+		// Change back sda to open drain.
+		OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
+		// Release it...
+		WRITE_SDA(1);
+
+		state = is_read? READ_BYTE_ACK : WRITE_BYTE_ACK;
+		break;
 
 	case READ_BYTE_ACK:
 		// Advance to the next byte.
@@ -525,18 +534,15 @@ void EXTI2_IRQHandler(void) {
 
 		// Finished the byte....
 		if (bit_count == 8) {
-			// Finished writing the bits to the master
-			// Change back to capture rising edge of SCL, to capture the ACK bit
-			//CAPTURE_RISING_EDGE(SCL_PIN_IN);
-			// Change back sda to open drain.
-			//OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
-
-			// Release it...
-			//WRITE_SDA(1);
-
-			// Update counters and wait for ack.
+			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+				// We are now xmitting the last bit, we'll need to change scl capture direction and realese SDA as soon
+				// as we are done
+				state = XMIT_BYTE_DONE;
+			} else {
+				// We are done with this byte -> Wait for the ack
+				state = WRITE_BYTE_ACK;
+			}
 			bwrite++;
-			state = WRITE_BYTE_ACK;
 		}
 
 		break;
