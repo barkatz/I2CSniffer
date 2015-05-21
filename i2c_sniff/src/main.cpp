@@ -104,8 +104,6 @@ typedef struct i2c_byte {
 static unsigned int			baudrate 				= 9600;
 
 static volatile uint8_t 	bit_count 				= 0; 		// Bit count for receiving/xmiting a byte
-uint8_t 					address_to_intercept 	= 0x1a;
-
 
 volatile unsigned int 		commands 				= 0x0; 		// The number of waiting commands in the queue
 
@@ -122,6 +120,8 @@ uint32_t stop_bit_count				= 0;
 uint32_t address_nacked 			= 0;
 uint32_t write_byte_nacks 			= 0;
 
+
+bool update_sequnce = false;					// The interrupts will update this flag when a new sequence is updated.
 
 i2c_byte* i2c_byte_list_head		= NULL;
 i2c_byte* i2c_byte_list_curr 		= NULL;
@@ -165,9 +165,6 @@ void disable();
 bool match_i2c_byte();
 bool match_stop_bit();
 bool match_start_bit();
-
-//void init_i2c_byte_list();
-
 
 /*********************************************************************************************************
  *  Impl
@@ -234,27 +231,33 @@ void disable() {
 	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-OFF-)", LCD_COLOR_GREY, LCD_COLOR_RED);
 }
 
+static void inline advance_i2c_byte() {
+	// If this is the first time this byte was hit -> we need to update the gui
+	if (i2c_byte_list_curr->hit != true) {
+		update_sequnce = true;
+	} else {
+		update_sequnce = false;
+	}
+
+	i2c_byte_list_curr->hit = true;
+	i2c_byte_list_curr = i2c_byte_list_curr->next;
+	i2c_byte_list_curr->actual_value = 0;
+}
 bool match_i2c_byte() {
 	// If we don't care, simply advance...
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
 	// If it matches, advance...
 	if ((i2c_byte_list_curr->op == OP_MATCH) && (i2c_byte_list_curr->value == i2c_byte_list_curr->actual_value)) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 	// If it is overwritten, advance...
 	if (i2c_byte_list_curr->op == OP_OVERRIDE) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
@@ -266,16 +269,12 @@ bool match_i2c_byte() {
 
 bool match_start_bit() {
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
 	if (i2c_byte_list_curr->op == OP_MATCH && i2c_byte_list_curr->type == TYPE_START) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
@@ -287,16 +286,12 @@ bool match_start_bit() {
 
 bool match_stop_bit() {
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
 	if (i2c_byte_list_curr->op == OP_MATCH && i2c_byte_list_curr->type == TYPE_STOP) {
-		i2c_byte_list_curr->hit = true;
-		i2c_byte_list_curr = i2c_byte_list_curr->next;
-		i2c_byte_list_curr->actual_value = 0;
+		advance_i2c_byte();
 		return true;
 	}
 
@@ -375,12 +370,6 @@ void inline scan_start_bit() {
 	CAPTURE_FALLING_EDGE(SDA_PIN_IN);
 	unmask_interrupt(SDA_PIN_IN);
 }
-
-bool bla_sda;
-bool bla_scl;
-
-bool bla_sda2;
-bool bla_scl2;
 
 /*
  * SCL Interrupt (PA2)
@@ -573,8 +562,6 @@ void EXTI2_IRQHandler(void) {
 			// We captured SCL rise, this might be the next data bit or a stop bit.
 			// The easiest way to check this is with a loop....
 			mask_interrupt(SCL_PIN_IN);
-			bla_scl = scl;
-			bla_sda = sda;
 
 			// check if sda is changing while scl is still high...
 			do {
@@ -584,8 +571,6 @@ void EXTI2_IRQHandler(void) {
 				}
 				scl = READ_SCL();
 			} while (scl && !stop_bit);
-			bla_scl2 = READ_SCL();
-			bla_sda2 = READ_SDA();
 
 			// if it was a stop bit, start scanning for start bit.
 			if (stop_bit) {
@@ -635,7 +620,6 @@ void update_lcd_stats() {
 
 	// Not sure why we needc this - check this out later (if we drop this lines appear at bottom as well.)
 	LCD_LOG_DeInit();
-	print_stat((uint16_t) 0, LCD_COLOR_GREEN, 	"    <<<TARGET ADDRESS 0x%08x>>>\n", address_to_intercept, address_to_intercept);
 	print_stat((uint16_t) 1, LCD_COLOR_GREEN, 	"Start bit count           = 0x%08x\n", start_bit_count, prev_start_bit_count);
 	print_stat((uint16_t) 2, LCD_COLOR_RED, 	"Stop bit count            = 0x%08x\n", stop_bit_count, prev_stop_bit_count);
 	print_stat((uint16_t) 3, LCD_COLOR_RED, 	"Nacked addresses          = 0x%08x\n", address_nacked, prev_address_nacked);
@@ -806,9 +790,20 @@ int main(int argc, char* argv[]) {
 	uint8_t cmd[0x100];
 	size_t size = 0;
 	while (1) {
+		/*
+		 * Handle command.
+		 */
 		if ( (size = read_uart_command(cmd)) ) {
-			LCD_BarLog(LCD_LOG_DEFAULT_COLOR,"%s\n", cmd);
+			//LCD_BarLog(LCD_LOG_DEFAULT_COLOR,"%s\n", cmd);
 			handle_command((char*) cmd, size);
+			uart_puts("OK\n");
+		}
+
+		/*
+		 * Handle status updates.
+		 */
+		if (update_sequnce) {
+
 		}
 	}
 
