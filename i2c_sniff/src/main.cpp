@@ -121,7 +121,7 @@ uint32_t address_nacked 			= 0;
 uint32_t write_byte_nacks 			= 0;
 
 
-bool update_sequnce = false;					// The interrupts will update this flag when a new sequence is updated.
+bool update_display_sequnce = false;					// The interrupts will update this flag when a new sequence is updated.
 
 i2c_byte* i2c_byte_list_head		= NULL;
 i2c_byte* i2c_byte_list_curr 		= NULL;
@@ -166,6 +166,11 @@ bool match_i2c_byte();
 bool match_stop_bit();
 bool match_start_bit();
 
+/*
+ * Updates the display with the current sequence status
+ */
+void update_display_sequence();
+
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
@@ -193,7 +198,44 @@ void init_buttons() {
 	STM_EVAL_PBInit(BUTTON_KEY, BUTTON_MODE_EXTI);
 }
 
+size_t count_list(i2c_byte* b) {
+	size_t i;
+	for(i=0; b ; b=b->next){};
+	return i;
+}
 
+void update_display_sequence() {
+	LCD_LOG_DeInit(); // Bah this ugly -> without this the lines appear on the bottom...
+	LCD_LOG_SetLine(0);
+
+	// format it...
+	for (i2c_byte* b = i2c_byte_list_head; b; b=b->next) {
+		if (b->hit) {
+			LCD_BarLog(LCD_COLOR_WHITE, "+");
+		}
+		switch (b->type) {
+		case TYPE_BYTE:
+			if (b->op == OP_OVERRIDE) {
+				LCD_BarLog(LCD_COLOR_WHITE, "*");
+			}
+
+			if (b->op == OP_DONT_CARE) {
+				LCD_BarLog(LCD_COLOR_WHITE, "? ");
+			} else {
+				LCD_BarLog(LCD_COLOR_WHITE, "0x%lx ", b->value);
+			}
+
+			break;
+		case TYPE_START:
+			LCD_BarLog(LCD_COLOR_WHITE, "[ ");
+			break;
+		case TYPE_STOP:
+			LCD_BarLog(LCD_COLOR_WHITE, "] ");
+			break;
+		}
+	}
+	LCD_BarLog(LCD_COLOR_WHITE, "\n");
+}
 
 void enable() {
 	// Start from matching address state.
@@ -211,7 +253,8 @@ void enable() {
 	// Start looking for start bit.
 	unmask_interrupt(SDA_PIN_IN);
 
-	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-ON-)", LCD_COLOR_BLUE, LCD_COLOR_WHITE);
+	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-ON-)", LCD_COLOR_BLUE, LCD_COLOR_WHITE);\
+	update_display_sequence();
 }
 
 void disable() {
@@ -229,20 +272,22 @@ void disable() {
 	OPEN_DRAIN_LINE(SDA_PORT_OUT, SDA_PIN_OUT);
 	WRITE_SDA(1);
 	LCD_LOG_SetHeader((uint8_t*) "BARS I2C Sniffer(-OFF-)", LCD_COLOR_GREY, LCD_COLOR_RED);
+	update_display_sequence();
 }
 
 static void inline advance_i2c_byte() {
 	// If this is the first time this byte was hit -> we need to update the gui
 	if (i2c_byte_list_curr->hit != true) {
-		update_sequnce = true;
+		update_display_sequnce = true;
 	} else {
-		update_sequnce = false;
+		update_display_sequnce = false;
 	}
 
 	i2c_byte_list_curr->hit = true;
 	i2c_byte_list_curr = i2c_byte_list_curr->next;
 	i2c_byte_list_curr->actual_value = 0;
 }
+
 bool match_i2c_byte() {
 	// If we don't care, simply advance...
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
@@ -299,6 +344,8 @@ bool match_stop_bit() {
 	i2c_byte_list_curr = i2c_byte_list_head;
 	return false;
 }
+
+
 
 /*
  * Test sequence to match:
@@ -609,29 +656,6 @@ void print_stat(uint16_t line_num, uint16_t color, const char* fmt, uint32_t cur
 	LCD_BarLog(c, fmt, (unsigned int) cur_counter);
 }
 
-void update_lcd_stats() {
-	uint16_t color;
-	// Global counters
-	static uint32_t prev_start_bit_count 			= 0;
-	static uint32_t prev_stop_bit_count 			= 0;
-
-	static uint32_t prev_address_nacked 			= 0;
-	static uint32_t prev_write_byte_nacks 			= 0;
-
-	// Not sure why we needc this - check this out later (if we drop this lines appear at bottom as well.)
-	LCD_LOG_DeInit();
-	print_stat((uint16_t) 1, LCD_COLOR_GREEN, 	"Start bit count           = 0x%08x\n", start_bit_count, prev_start_bit_count);
-	print_stat((uint16_t) 2, LCD_COLOR_RED, 	"Stop bit count            = 0x%08x\n", stop_bit_count, prev_stop_bit_count);
-	print_stat((uint16_t) 3, LCD_COLOR_RED, 	"Nacked addresses          = 0x%08x\n", address_nacked, prev_address_nacked);
-	print_stat((uint16_t) 4, LCD_COLOR_RED, 	"Write nacks               = 0x%08x\n", write_byte_nacks, prev_write_byte_nacks);
-
-	// Update counters
-	prev_start_bit_count		= start_bit_count;
-	prev_stop_bit_count			= stop_bit_count;
-	prev_write_byte_nacks		= write_byte_nacks;
-	prev_address_nacked 	 	= address_nacked;
-}
-
 
 /*
  * Reads a complete uart command into cmd.
@@ -672,6 +696,7 @@ void free_list(i2c_byte* list) {
 
 	while (cur) {
 		next = cur->next;
+		memset(cur, 0, sizeof(*cur));
 		free(cur);
 		cur = next;
 	}
@@ -711,7 +736,7 @@ void handle_command(char* cmd, size_t size) {
 	// Tokenize the command.
 	// Remember that the command is of form: [ 0x12 *0x33 0x22... ] )
 	while (tok) {
-
+		i2c_byte_list_curr->hit = false;
 		if (tok[0] == '[') {
 			// If the token is '[' we need to match a START bit
 			i2c_byte_list_curr->op 				= OP_MATCH;
@@ -762,7 +787,11 @@ void handle_command(char* cmd, size_t size) {
 
 	// Start matching from the curr ptr...
 	i2c_byte_list_curr = i2c_byte_list_head;
+	update_display_sequence();
 }
+
+
+
 
 int main(int argc, char* argv[]) {
 	init_lcd();
@@ -802,8 +831,9 @@ int main(int argc, char* argv[]) {
 		/*
 		 * Handle status updates.
 		 */
-		if (update_sequnce) {
-
+		if (update_display_sequnce) {
+			update_display_sequence();
+			update_display_sequnce = false;
 		}
 	}
 
