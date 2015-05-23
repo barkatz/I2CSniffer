@@ -43,7 +43,8 @@ enum FLIP_STATE {
 
 	READ_BYTE,			// Master reads 8 bits of data (We are sending)
 	READ_BYTE_ACK,		// Read 1 bit of ack/nack from master (We are receiving)
-	XMIT_BYTE_DONE, 	// After the last bit is xmitted we need to change back to capture SCL clock rise
+	XMIT_BYTE_DONE, 	// When xmitting the last bit, we need to wait for it to finish,
+						// and then switch to capture SCL rise and not fall.
 
 	WRITE_BYTE,			// Master writes 8 bits of data (We are receiving)
 	WRITE_BYTE_ACK,		// We write ack (Actually the real slave does ^^)
@@ -52,30 +53,38 @@ enum FLIP_STATE {
 	DISABLED			// Disabled...
 };
 
+enum I2C_BYTE_HIT {
+	I2C_BYTE_MATCHED,
+	I2C_BYTE_MISS_MATCHED,
+	I2C_BYTE_NOT_SEEN
+};
 
 enum I2C_BYTE_OP {
-	OP_MATCH,
-	OP_OVERRIDE,
-	OP_DONT_CARE
+	OP_MATCH,				// The byte should be matched.
+	OP_OVERRIDE,			// The byte should be overwritten
+	OP_DONT_CARE			// A joker byte - it we ignore it.
 };
 
-enum I2C_BYTE_TYPE {
-	TYPE_BYTE,
-	TYPE_START,
-	TYPE_STOP
+enum I2C_SEQUNCE_TYPE {
+	TYPE_BYTE,				// The sequence is a BYTE type
+	TYPE_START,				// The sequence is of START BIT type.
+	TYPE_STOP				// The sequence is of STOP BIT type.
 };
 
-struct i2c_byte;
-typedef struct i2c_byte {
-	I2C_BYTE_OP 	op;
-	I2C_BYTE_TYPE 	type;
+/*
+ * The following define a single link in a the sequence we are matching.
+ */
+struct i2c_sequence_t;
+typedef struct i2c_sequence_t {
+	I2C_BYTE_OP 			op;				// match or overwrite?
+	I2C_SEQUNCE_TYPE 		type;			// a normal byte or start/stop bit?
 
-	uint32_t 		actual_value;
-	uint32_t	 	value;
-	bool 			hit;
+	uint32_t 				actual_value;	// The actual value from the i2c bus
+	uint32_t	 			value;			// The value we expect to match: valid only incase of MATCHING bytes.
+	I2C_BYTE_HIT 			hit;			// Did we hit this sequence in the list?
 
-	i2c_byte* next;
-} i2c_byte;
+	i2c_sequence_t* 			next;
+} i2c_sequnce_t;
 
 
 
@@ -86,91 +95,94 @@ typedef struct i2c_byte {
 
 #define CLEAR_PR(pin) 					EXTI->PR = 1 << (pin)
 
-#define CAPTURE_FALLING_EDGE(pin) 	EXTI->RTSR &= ~(1 << (pin)); \
-									EXTI->FTSR |= (1 << (pin))
+#define CAPTURE_FALLING_EDGE(pin) 		EXTI->RTSR &= ~(1 << (pin)); \
+										EXTI->FTSR |= (1 << (pin))
 
-#define CAPTURE_RISING_EDGE(pin) 	EXTI->FTSR &= ~(1 << (pin)); \
-									EXTI->RTSR |= (1 << (pin))
+#define CAPTURE_RISING_EDGE(pin) 		EXTI->FTSR &= ~(1 << (pin)); \
+										EXTI->RTSR |= (1 << (pin))
 
-#define PUSH_PULL_LINE(port,pin)	PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
-									PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_PP << ((uint16_t) pin))
+#define PUSH_PULL_LINE(port,pin)		PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
+										PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_PP << ((uint16_t) pin))
 
-#define OPEN_DRAIN_LINE(port,pin) 	PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
-									PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_OD	<< ((uint16_t) pin))
+#define OPEN_DRAIN_LINE(port,pin) 		PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
+										PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_OD	<< ((uint16_t) pin))
 
 /********************************************************************************************************
  *  Globals
  *********************************************************************************************************/
-static unsigned int			baudrate 				= 9600;
+static unsigned int			baudrate 				= 9600;		// The USART baudrate
 
 static volatile uint8_t 	bit_count 				= 0; 		// Bit count for receiving/xmiting a byte
 
-volatile unsigned int 		commands 				= 0x0; 		// The number of waiting commands in the queue
+volatile unsigned int 		commands 				= 0x0; 		// The number of waiting USART commands in the queue
 
 // State of the state machine that flips.
 FLIP_STATE state;
 
-// Bytes written/read buffers.
-uint32_t bread 						= 0;
-uint32_t bwrite 					= 0;
+// Bytes written/read counters
 
 // Global counters
 uint32_t start_bit_count			= 0;
 uint32_t stop_bit_count				= 0;
 uint32_t address_nacked 			= 0;
 uint32_t write_byte_nacks 			= 0;
+uint32_t bread 						= 0; // bytes read
+uint32_t bwrite 					= 0; // bytes written
 
+// This flag is to update display with a sequence:
+// It should be changed:
+// 1) When a new sequence is received
+// 2) When a new sequence link is hit (to display the +)
+bool update_display_sequnce = false;
 
-bool update_display_sequnce = false;					// The interrupts will update this flag when a new sequence is updated.
-
-i2c_byte* i2c_byte_list_head		= NULL;
-i2c_byte* i2c_byte_list_curr 		= NULL;
+// The head/curr pointer of the sequence list
+i2c_sequence_t* i2c_byte_list_head		= NULL;
+i2c_sequence_t* i2c_byte_list_curr 		= NULL;
 
 
 
 /********************************************************************************************************
  *  Decl
  *********************************************************************************************************/
-
 /*
  * Reads from a port
  */
-bool inline read_port(uint32_t port, uint8_t pin);
+static bool inline read_port(uint32_t port, uint8_t pin);
 
 /*
  * Writes to a port
  */
-void inline write_port(uint32_t port, uint8_t pin, bool val);
+static void inline write_port(uint32_t port, uint8_t pin, bool val);
 
 /*
  * Inits buttons behavior.
  */
-void init_buttons();
+static void init_buttons();
 
 /*
  * Inits LCD display.
  */
-void init_lcd(void);
+static void init_lcd(void);
 
 /*
- * Enables/Disable interception mode.
+ * Enables/Disable the module.
  */
-void enable();
-void disable();
+static void enable();
+static void disable();
 
 /*
- * Matches the current byte against the current i2c_byte.
- * This advances curr accordingly.
+ * Matches the current sequence link.
+ * This advances curr accordingly, and return true if it matched.
  */
-bool match_i2c_byte();
-bool match_stop_bit();
-bool match_start_bit();
-
+static bool match_i2c_byte();
+static bool match_stop_bit();
+static bool match_start_bit();
 /*
- * Updates the display with the current sequence status
+ * i2c sequence list related
  */
-void update_display_sequence();
-
+static void update_display_sequence();
+static void inline advance_i2c_byte();
+static void free_list(i2c_sequence_t* list);
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
@@ -198,46 +210,45 @@ void init_buttons() {
 	STM_EVAL_PBInit(BUTTON_KEY, BUTTON_MODE_EXTI);
 }
 
-size_t count_list(i2c_byte* b) {
-	size_t i;
-	for(i=0; b ; b=b->next){};
-	return i;
-}
 
-void update_display_sequence() {
+static void update_display_sequence() {
 	LCD_LOG_DeInit(); // Bah this ugly -> without this the lines appear on the bottom...
 	LCD_LOG_SetLine(0);
 
 	// format it...
-	for (i2c_byte* b = i2c_byte_list_head; b; b=b->next) {
-		if (b->hit) {
+	for (i2c_sequence_t* b = i2c_byte_list_head; b; b=b->next) {
+		// If we hit this sequence link - print +
+		if (b->hit == I2C_BYTE_MATCHED) {
 			LCD_BarLog(LCD_COLOR_WHITE, "+");
+		// If we hit it, but we missmatched it, and its a byte, print the value we saw in parentheses
+		} else if ((b->hit == I2C_BYTE_MISS_MATCHED) && (b->type == TYPE_BYTE)) {
+			LCD_BarLog(LCD_COLOR_WHITE, "(0x%lx)", b->actual_value);
 		}
 		switch (b->type) {
-		case TYPE_BYTE:
-			if (b->op == OP_OVERRIDE) {
-				LCD_BarLog(LCD_COLOR_WHITE, "*");
-			}
+			case TYPE_BYTE:
+				if (b->op == OP_OVERRIDE) {
+					LCD_BarLog(LCD_COLOR_WHITE, "*");
+				}
 
-			if (b->op == OP_DONT_CARE) {
-				LCD_BarLog(LCD_COLOR_WHITE, "? ");
-			} else {
-				LCD_BarLog(LCD_COLOR_WHITE, "0x%lx ", b->value);
-			}
+				if (b->op == OP_DONT_CARE) {
+					LCD_BarLog(LCD_COLOR_WHITE, "? ");
+				} else {
+					LCD_BarLog(LCD_COLOR_WHITE, "0x%lx ", b->value);
+				}
 
-			break;
-		case TYPE_START:
-			LCD_BarLog(LCD_COLOR_WHITE, "[ ");
-			break;
-		case TYPE_STOP:
-			LCD_BarLog(LCD_COLOR_WHITE, "] ");
-			break;
-		}
+				break;
+			case TYPE_START:
+				LCD_BarLog(LCD_COLOR_WHITE, "[ ");
+				break;
+			case TYPE_STOP:
+				LCD_BarLog(LCD_COLOR_WHITE, "] ");
+				break;
+			}
 	}
 	LCD_BarLog(LCD_COLOR_WHITE, "\n");
 }
 
-void enable() {
+static void enable() {
 	// Start from matching address state.
 	state = MATCH_ADDRESS;
 
@@ -257,7 +268,7 @@ void enable() {
 	update_display_sequence();
 }
 
-void disable() {
+static void disable() {
 	// Stop interrupts.
 	mask_interrupt(SDA_PIN_IN);
 	mask_interrupt(SCL_PIN_IN);
@@ -275,20 +286,21 @@ void disable() {
 	update_display_sequence();
 }
 
+
 static void inline advance_i2c_byte() {
 	// If this is the first time this byte was hit -> we need to update the gui
-	if (i2c_byte_list_curr->hit != true) {
+	if (i2c_byte_list_curr->hit != I2C_BYTE_MATCHED) {
 		update_display_sequnce = true;
 	} else {
 		update_display_sequnce = false;
 	}
 
-	i2c_byte_list_curr->hit = true;
+	i2c_byte_list_curr->hit = I2C_BYTE_MATCHED;
 	i2c_byte_list_curr = i2c_byte_list_curr->next;
 	i2c_byte_list_curr->actual_value = 0;
 }
 
-bool match_i2c_byte() {
+static bool match_i2c_byte() {
 	// If we don't care, simply advance...
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
 		advance_i2c_byte();
@@ -299,6 +311,10 @@ bool match_i2c_byte() {
 	if ((i2c_byte_list_curr->op == OP_MATCH) && (i2c_byte_list_curr->value == i2c_byte_list_curr->actual_value)) {
 		advance_i2c_byte();
 		return true;
+
+	} else if ((i2c_byte_list_curr->op == OP_MATCH) && (i2c_byte_list_curr->value != i2c_byte_list_curr->actual_value)) {
+		i2c_byte_list_curr->hit = I2C_BYTE_MISS_MATCHED;
+		update_display_sequnce = true;
 	}
 	// If it is overwritten, advance...
 	if (i2c_byte_list_curr->op == OP_OVERRIDE) {
@@ -312,7 +328,7 @@ bool match_i2c_byte() {
 	return false;
 }
 
-bool match_start_bit() {
+static bool match_start_bit() {
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
 		advance_i2c_byte();
 		return true;
@@ -329,7 +345,7 @@ bool match_start_bit() {
 }
 
 
-bool match_stop_bit() {
+static bool match_stop_bit() {
 	if (i2c_byte_list_curr->op == OP_DONT_CARE) {
 		advance_i2c_byte();
 		return true;
@@ -408,7 +424,7 @@ void EXTI0_IRQHandler(void) {
 
 }
 
-void inline scan_start_bit() {
+static void inline scan_start_bit() {
 	// Zero bit count
 	bit_count = 0;
 	// 1) disable SCL interrupt
@@ -640,28 +656,12 @@ void EXTI2_IRQHandler(void) {
 }
 #endif
 
-void print_stat(uint16_t line_num, uint16_t color, const char* fmt, uint32_t cur_counter, uint32_t prev_counter) {
-	uint16_t c;
-	// Clear line
-	LCD_ClearLine((uint16_t) ((line_num + YWINDOW_MIN) * 24));
-	// Set line
-	LCD_LOG_SetLine(line_num);
-
-	// If changed, change color.
-	if (cur_counter == prev_counter) {
-		c = LCD_COLOR_WHITE;
-	} else {
-		c = color;
-	}
-	LCD_BarLog(c, fmt, (unsigned int) cur_counter);
-}
-
 
 /*
  * Reads a complete uart command into cmd.
  * Returns true/false if there was a command in queue.
  */
-size_t read_uart_command(uint8_t* cmd){
+static size_t read_uart_command(uint8_t* cmd){
 	size_t i = 0;
 	uint8_t 	 b;
 	// Check if there is any rdy command in the fifo
@@ -689,8 +689,8 @@ size_t read_uart_command(uint8_t* cmd){
 /*
  * Free's a sequence list of bytes to trace
  */
-void free_list(i2c_byte* list) {
-	i2c_byte *cur, *next;
+static void free_list(i2c_sequence_t* list) {
+	i2c_sequence_t *cur, *next;
 	cur = list;
 	next = cur->next;
 
@@ -712,7 +712,7 @@ void free_list(i2c_byte* list) {
  * *0x30 	--> Byte to overwrite
  * ? 		--> Don't care byte
  */
-void handle_command(char* cmd, size_t size) {
+static void handle_command(char* cmd, size_t size) {
 	char delim[] = " \t";
 	char* tok = strtok(cmd, delim);
 
@@ -729,47 +729,38 @@ void handle_command(char* cmd, size_t size) {
 	free_list(i2c_byte_list_head);
 
 	// Create a new head, and make the curr list item point at it.
-	i2c_byte_list_head = (i2c_byte*) malloc(sizeof(i2c_byte));
+	i2c_byte_list_head = (i2c_sequence_t*) malloc(sizeof(i2c_sequence_t));
 	i2c_byte_list_curr = i2c_byte_list_head;
-	i2c_byte_list_curr->hit = false;
+	i2c_byte_list_curr->hit = I2C_BYTE_NOT_SEEN;
 
 	// Tokenize the command.
 	// Remember that the command is of form: [ 0x12 *0x33 0x22... ] )
 	while (tok) {
-		i2c_byte_list_curr->hit = false;
+		i2c_byte_list_curr->hit = I2C_BYTE_NOT_SEEN;
+		i2c_byte_list_curr->actual_value 	= 0;
 		if (tok[0] == '[') {
 			// If the token is '[' we need to match a START bit
 			i2c_byte_list_curr->op 				= OP_MATCH;
 			i2c_byte_list_curr->type 			= TYPE_START;
-			i2c_byte_list_curr->actual_value 	= 0;
-
-
 		} else if (tok[0] == ']'){
 			// If the token is '[' we need to match a STOP bit
 			i2c_byte_list_curr->op 				= OP_MATCH;
 			i2c_byte_list_curr->type 			= TYPE_STOP;
-			i2c_byte_list_curr->actual_value 	= 0;
-
 		} else if (tok[0] == '*') {
 			// If the token starts with '*' we need to overwrite the next byte
 			i2c_byte_list_curr->op 				= OP_OVERRIDE;
 			i2c_byte_list_curr->type 			= TYPE_BYTE;
 			i2c_byte_list_curr->value 			= strtol(tok+1, NULL, 0); // skip the *
-			i2c_byte_list_curr->actual_value 	= 0;
-
 		} else if (tok[0] == '?') {
 			// If the token starts with '?' we don't care about this byte
 			i2c_byte_list_curr->op 				= OP_DONT_CARE;
 			i2c_byte_list_curr->type 			= TYPE_BYTE;
 			i2c_byte_list_curr->value 			= 0;
-			i2c_byte_list_curr->actual_value 	= 0;
-
 		} else {
 			// If its none of the above we just match the number
-			i2c_byte_list_curr->op 		= OP_MATCH;
-			i2c_byte_list_curr->type 	= TYPE_BYTE;
-			i2c_byte_list_curr->value 	= strtol(tok, NULL, 0);
-			i2c_byte_list_curr->actual_value = 0;
+			i2c_byte_list_curr->op 				= OP_MATCH;
+			i2c_byte_list_curr->type 			= TYPE_BYTE;
+			i2c_byte_list_curr->value 			= strtol(tok, NULL, 0);
 		}
 
 		// On to the next item in the sequence
@@ -777,8 +768,7 @@ void handle_command(char* cmd, size_t size) {
 
 		// Allocate a new room for the next token if needed.
 		if (tok) {
-			i2c_byte_list_curr->next 		= (i2c_byte*) malloc(sizeof(i2c_byte));
-			i2c_byte_list_curr->next->hit 	= false;
+			i2c_byte_list_curr->next 		= (i2c_sequence_t*) malloc(sizeof(i2c_sequence_t));
 		} else {
 			i2c_byte_list_curr->next 	= NULL;
 		}
@@ -796,7 +786,6 @@ void handle_command(char* cmd, size_t size) {
 int main(int argc, char* argv[]) {
 	init_lcd();
 	init_buttons();
-
 
 	/*
 	 * Set up interrupts and gpios.
