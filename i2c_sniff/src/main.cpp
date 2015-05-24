@@ -68,7 +68,9 @@ enum I2C_BYTE_OP {
 enum I2C_SEQUNCE_TYPE {
 	TYPE_BYTE,				// The sequence is a BYTE type
 	TYPE_START,				// The sequence is of START BIT type.
-	TYPE_STOP				// The sequence is of STOP BIT type.
+	TYPE_STOP,				// The sequence is of STOP BIT type.
+	TYPE_NAK,				// NAK bit
+	TYPE_ACK				// ACK bit
 };
 
 /*
@@ -162,9 +164,8 @@ static void command_update_sequence(void);
  * Enables or disables sniff_mode according to the command
  */
 static void command_update_sniff_mode(void);
-// Sends the current byte  via serial (including symbol index! to make
-// sure we didn't lose any symbols.
-static void send_sequence(I2C_SEQUNCE_TYPE type, char b);
+// Sends the current byte  via serial (including symbol index! to make sure we didn't lose any symbols)
+static void inline send_sequence(I2C_SEQUNCE_TYPE type);
 /*
  * USART Command parsing
  */
@@ -280,6 +281,10 @@ static void update_display_sequence() {
 			case TYPE_STOP:
 				LCD_BarLog(LCD_COLOR_WHITE, "] ");
 				break;
+			case TYPE_ACK:
+			case TYPE_NAK:
+					LCD_BarLog(LCD_COLOR_WHITE, "list is invalid.\n");
+					break;
 			}
 	}
 	LCD_BarLog(LCD_COLOR_WHITE, "\n");
@@ -445,14 +450,14 @@ void EXTI0_IRQHandler(void) {
 		start_bit_count++;
 
 
-		// Make sure we are matching start bit, or in sniff mode.
-		if ((!match_start_bit()) || sniff_mode) {
+		// Make sure we are matching start bit and NOT sniffing
+		if (!sniff_mode && !match_start_bit()) {
 			return;
 		}
 
 		// If we are sniffing, we need to send this byte via serial.
 		if (sniff_mode) {
-			send_sequence(TYPE_START, 0);
+			send_sequence(TYPE_START);
 		}
 		// Move on.
 		state = MATCH_ADDRESS;
@@ -502,6 +507,10 @@ void EXTI2_IRQHandler(void) {
 		bit_count++;
 		if (bit_count == 8) {
 			state = ACK_ADDRESS_BIT;
+			// If we are sniffing, we need to send this byte via serial.
+			if (sniff_mode) {
+				send_sequence(TYPE_BYTE);
+			}
 		}
 		break; /* MATCH_ADDRESS */
 
@@ -509,9 +518,8 @@ void EXTI2_IRQHandler(void) {
 		// Is it read or write address?
 		is_read = i2c_byte_list_curr->actual_value & 1;
 
-		// Check if the current actual_value matches the value expected...
-		// Or we are in sniff mode.
-		if (!match_i2c_byte()){
+		// Check if the current actual_value matches the value expected... and that we are NOT sniffing
+		if (!sniff_mode && !match_i2c_byte()){
 			// Nope, start again.
 			scan_start_bit();
 			return;
@@ -520,16 +528,21 @@ void EXTI2_IRQHandler(void) {
 		// Check for NAK/ACK
 		if (sda) {
 			// NAK
-			//-> Address doesn't exist. search for start bit.
+			//-> Address doesn't exist. search for start bit. If we are sniffing send the nak
 			address_nacked++;
+			if (sniff_mode) {
+				send_sequence(TYPE_NAK);
+			}
 			scan_start_bit();
 		} else {
 			// ACK -> Address found, slave answered.
-
+			if (sniff_mode) {
+				send_sequence(TYPE_ACK);
+			}
 			// If the next state is a OVERWRITE STATE we need to capture SCL fall. (to prepare the next bit).
 			// In that case, the interrupt will be triggered when ACK SCL has fallen.
 			// Note here - we can't change SDA to push/pull yet, since SCL is HIGH.
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)) {
 				CAPTURE_FALLING_EDGE(SCL_PIN_IN);
 			}
 
@@ -541,7 +554,7 @@ void EXTI2_IRQHandler(void) {
 
 	case READ_BYTE:
 		// If we are overriding the byte (answering instead of the slave).
-		if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+		if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)){
 			// set SDA OUT port to push/pull on the first bit
 			// This can be done now since SCL is low.
 			if (bit_count == 0) {
@@ -559,7 +572,7 @@ void EXTI2_IRQHandler(void) {
 
 		// Finished the byte....
 		if (bit_count == 8) {
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)){
 				// We are now xmitting the last bit, we'll need to change scl capture direction and realese SDA as soon
 				// as we are done
 				state = XMIT_BYTE_DONE;
@@ -567,6 +580,10 @@ void EXTI2_IRQHandler(void) {
 				// We are done with this byte -> Wait for the ack
 				state = READ_BYTE_ACK;
 			}
+		}
+
+		if (sniff_mode) {
+			send_sequence(TYPE_BYTE);
 		}
 		// Update counters and wait for ack.
 		bread++;
@@ -586,17 +603,24 @@ void EXTI2_IRQHandler(void) {
 
 	case READ_BYTE_ACK:
 		// Advance to the next byte.
-		if (!match_i2c_byte()) {
+		if (!sniff_mode && !match_i2c_byte()) {
 			scan_start_bit();
 			return;
 		}
 
 		if (sda) {
 			// NACK -> Last byte the master wants to read. We expect stop bit.
+			if (sniff_mode) {
+				send_sequence(TYPE_NAK);
+			}
 			match_stop_bit();
 			stop_bit_count++;
 			scan_start_bit();
 		} else {
+			// Ack!
+			if (sniff_mode) {
+				send_sequence(TYPE_ACK);
+			}
 			// ACK -> Master wants to read more bytes
 			bit_count = 0;
 			// No actual value yet for the next byte.
@@ -604,7 +628,7 @@ void EXTI2_IRQHandler(void) {
 
 			// If the next state is a OVERWRITE STATE we need to capture SCL fall. (to prepare the next bit).
 			// In that case, the interrupt will be triggered when ACK SCL has fallen.
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)) {
 				CAPTURE_FALLING_EDGE(SCL_PIN_IN);
 			}
 			state = READ_BYTE;
@@ -613,7 +637,7 @@ void EXTI2_IRQHandler(void) {
 
 	case WRITE_BYTE:
 		// If we are overriding the byte (replacing the master request...).
-		if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+		if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)) {
 			// set SDA OUT port to push/pull on the first bit
 			// This can be done now since SCL is low.
 			if (bit_count == 0) {
@@ -631,7 +655,7 @@ void EXTI2_IRQHandler(void) {
 
 		// Finished the byte....
 		if (bit_count == 8) {
-			if (i2c_byte_list_curr->op == OP_OVERRIDE) {
+			if (!sniff_mode && (i2c_byte_list_curr->op == OP_OVERRIDE)) {
 				// We are now xmitting the last bit, we'll need to change scl capture direction and realese SDA as soon
 				// as we are done
 				state = XMIT_BYTE_DONE;
@@ -640,13 +664,16 @@ void EXTI2_IRQHandler(void) {
 				state = WRITE_BYTE_ACK;
 			}
 			bwrite++;
+			if (sniff_mode) {
+				send_sequence(TYPE_BYTE);
+			}
 		}
 
 		break;
 
 	case WRITE_BYTE_ACK:
 		// Advance to the next byte.
-		if (!match_i2c_byte()) {
+		if (!sniff_mode && !match_i2c_byte()) {
 			scan_start_bit();
 			return;
 		}
@@ -654,12 +681,14 @@ void EXTI2_IRQHandler(void) {
 		if (sda) {
 			// slave could not process it. nothing we can do
 			write_byte_nacks++;
+			send_sequence(TYPE_NAK);
 		} else {
 			// This is tricky. The master can now do 2 things:
 			// A) Send another byte
 			// B) Send a stop
 			// We now wait for clock to go up again. then we will check if its a data bit or stop bit
 			// No actual value yet for the next byte.
+			send_sequence(TYPE_ACK);
 			bit_count = 0;
 			i2c_byte_list_curr->actual_value = 0;
 			state = WRITE_BYTE_UNK;
@@ -682,6 +711,7 @@ void EXTI2_IRQHandler(void) {
 
 			// if it was a stop bit, start scanning for start bit.
 			if (stop_bit) {
+				send_sequence(TYPE_STOP);
 				match_stop_bit();
 				stop_bit_count++;
 				scan_start_bit();
@@ -704,8 +734,10 @@ void EXTI2_IRQHandler(void) {
 /*
  * Sends a sequence symbol via serial including an index.
  */
-static void send_sequence(I2C_SEQUNCE_TYPE type, char b) {
-
+static void inline send_sequence(I2C_SEQUNCE_TYPE type) {
+	// Reset for next one... and update index
+	i2c_byte_list_curr->actual_value = 0;
+	symbol_count++;
 }
 
 /*
@@ -881,6 +913,7 @@ static void handle_command() {
 		}
 	}
 	uart_puts("Unkown command!\n");
+
 }
 
 

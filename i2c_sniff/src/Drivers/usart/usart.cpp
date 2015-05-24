@@ -30,28 +30,16 @@ void init_usart(uint32_t baud_rate) {
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 	STM_EVAL_COMInit(COM1, &USART_InitStructure);
 
-
 	// And start the RX interrupt. Tx interrupt will be activated only when we have something to send.
 	USART_ITConfig(EVAL_COM1, USART_IT_RXNE, ENABLE);
 
 }
 
 bool uart_send(uint8_t elem) {
-	bool turn_on_int = false;
 
-	// If tx queue is empty -> should turn on tx interrupt.
-	if (tx_buffer.is_empty()) {
-		turn_on_int = true;
-	}
-//
-//	// try to push the elem to the tx queue. will not work if its full
+	// try to push the elem to the tx queue. will not work if its full
 	bool pushed = tx_buffer.push(elem);
-//
-//	// Enable the interrupt if needed.
-	if (turn_on_int) {
-		USART_ITConfig(EVAL_COM1, USART_IT_TXE, ENABLE);
-	}
-
+	USART_ITConfig(EVAL_COM1, USART_IT_TXE, ENABLE);
 	return pushed;
 }
 
