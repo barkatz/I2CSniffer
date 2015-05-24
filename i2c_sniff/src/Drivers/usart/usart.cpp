@@ -2,7 +2,7 @@
 #include "Drivers/usart/usart.hpp"
 #include "Drivers/cyclic_buffer.hpp"
 
-extern volatile unsigned int commands;
+extern volatile unsigned int commands_count;
 
 #define UART_RX_BUFFER_SIZE 0x100
 #define UART_TX_BUFFER_SIZE 0x100
@@ -85,8 +85,8 @@ extern "C" void USART3_IRQHandler(void) {
 			// This is bad.
 		}
 		// If this is a command end, increment the rdy command count
-		if (b == '\n') {
-			commands++;
+		if (b == '$') {
+			commands_count++;
 		}
 	}
 	// Is it a TX interrupt?

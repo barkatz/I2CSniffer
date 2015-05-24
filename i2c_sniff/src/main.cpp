@@ -86,6 +86,13 @@ typedef struct i2c_sequence_t {
 	i2c_sequence_t* 			next;
 } i2c_sequnce_t;
 
+/*
+ * USART Commands
+ */
+typedef struct commands_t {
+	const char *command;
+	void (*func) (void);
+} commands_t;
 
 
 // Easier macro
@@ -106,40 +113,6 @@ typedef struct i2c_sequence_t {
 
 #define OPEN_DRAIN_LINE(port,pin) 		PORT_GPIOx(port)->OTYPER &= ~((GPIO_OTYPER_OT_0) << ((uint16_t) pin)); \
 										PORT_GPIOx(port)->OTYPER |= (uint16_t) (GPIO_OType_OD	<< ((uint16_t) pin))
-
-/********************************************************************************************************
- *  Globals
- *********************************************************************************************************/
-static unsigned int			baudrate 				= 9600;		// The USART baudrate
-
-static volatile uint8_t 	bit_count 				= 0; 		// Bit count for receiving/xmiting a byte
-
-volatile unsigned int 		commands 				= 0x0; 		// The number of waiting USART commands in the queue
-
-// State of the state machine that flips.
-FLIP_STATE state;
-
-// Bytes written/read counters
-
-// Global counters
-uint32_t start_bit_count			= 0;
-uint32_t stop_bit_count				= 0;
-uint32_t address_nacked 			= 0;
-uint32_t write_byte_nacks 			= 0;
-uint32_t bread 						= 0; // bytes read
-uint32_t bwrite 					= 0; // bytes written
-
-// This flag is to update display with a sequence:
-// It should be changed:
-// 1) When a new sequence is received
-// 2) When a new sequence link is hit (to display the +)
-bool update_display_sequnce = false;
-
-// The head/curr pointer of the sequence list
-i2c_sequence_t* i2c_byte_list_head		= NULL;
-i2c_sequence_t* i2c_byte_list_curr 		= NULL;
-
-
 
 /********************************************************************************************************
  *  Decl
@@ -177,12 +150,74 @@ static void disable();
 static bool match_i2c_byte();
 static bool match_stop_bit();
 static bool match_start_bit();
+
 /*
  * i2c sequence list related
  */
 static void update_display_sequence();
 static void inline advance_i2c_byte();
 static void free_list(i2c_sequence_t* list);
+static void command_update_sequence(void);
+/*
+ * Enables or disables sniff_mode according to the command
+ */
+static void command_update_sniff_mode(void);
+// Sends the current byte  via serial (including symbol index! to make
+// sure we didn't lose any symbols.
+static void send_sequence(I2C_SEQUNCE_TYPE type, char b);
+/*
+ * USART Command parsing
+ */
+static bool read_uart_command();
+
+
+/********************************************************************************************************
+ *  Globals
+ *********************************************************************************************************/
+static unsigned int			baudrate 				= 115200;		// The USART baudrate
+
+static volatile uint8_t 	bit_count 				= 0; 		// Bit count for receiving/xmiting a byte
+
+volatile unsigned int 		commands_count 			= 0x0; 		// The number of waiting USART commands in the queue
+static 	char 				*cmd = 0;								// Current command
+
+// State of the state machine that flips.
+FLIP_STATE state;
+
+// Bytes written/read counters
+
+// Global counters
+uint32_t start_bit_count			= 0;
+uint32_t stop_bit_count				= 0;
+uint32_t address_nacked 			= 0;
+uint32_t write_byte_nacks 			= 0;
+uint32_t bread 						= 0; // bytes read
+uint32_t bwrite 					= 0; // bytes written
+
+// This flag is to update display with a sequence:
+// It should be changed:
+// 1) When a new sequence is received
+// 2) When a new sequence link is hit (to display the +)
+bool update_display_sequnce = false;
+
+// The head/curr pointer of the sequence list
+i2c_sequence_t* i2c_byte_list_head		= NULL;
+i2c_sequence_t* i2c_byte_list_curr 		= NULL;
+
+
+char delim[] = " \t";
+// Is this module in sniff mode? In this mode all bytes (including stop/start bits) are being sent to serial
+bool sniff_mode = false;
+size_t symbol_count = 0;
+
+// Global commands array from usart
+commands_t commands[] ={
+		{.command="start", 	.func = enable},
+		{.command="stop", 	.func = disable},
+		{.command="seq", 	.func = command_update_sequence},
+		{.command="sniff", 	.func = command_update_sniff_mode},
+};
+
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
@@ -212,8 +247,10 @@ void init_buttons() {
 
 
 static void update_display_sequence() {
+	//LCD_LOG_ClearTextZone();
 	LCD_LOG_DeInit(); // Bah this ugly -> without this the lines appear on the bottom...
 	LCD_LOG_SetLine(0);
+
 
 	// format it...
 	for (i2c_sequence_t* b = i2c_byte_list_head; b; b=b->next) {
@@ -246,6 +283,7 @@ static void update_display_sequence() {
 			}
 	}
 	LCD_BarLog(LCD_COLOR_WHITE, "\n");
+	update_display_sequnce = false;
 }
 
 static void enable() {
@@ -406,9 +444,15 @@ void EXTI0_IRQHandler(void) {
 		// SDA falls while SCL was high -> start bit.
 		start_bit_count++;
 
-		// Make sure we are matching start bit
-		if (!match_start_bit()) {
+
+		// Make sure we are matching start bit, or in sniff mode.
+		if ((!match_start_bit()) || sniff_mode) {
 			return;
+		}
+
+		// If we are sniffing, we need to send this byte via serial.
+		if (sniff_mode) {
+			send_sequence(TYPE_START, 0);
 		}
 		// Move on.
 		state = MATCH_ADDRESS;
@@ -466,6 +510,7 @@ void EXTI2_IRQHandler(void) {
 		is_read = i2c_byte_list_curr->actual_value & 1;
 
 		// Check if the current actual_value matches the value expected...
+		// Or we are in sniff mode.
 		if (!match_i2c_byte()){
 			// Nope, start again.
 			scan_start_bit();
@@ -656,33 +701,65 @@ void EXTI2_IRQHandler(void) {
 }
 #endif
 
+/*
+ * Sends a sequence symbol via serial including an index.
+ */
+static void send_sequence(I2C_SEQUNCE_TYPE type, char b) {
+
+}
 
 /*
  * Reads a complete uart command into cmd.
  * Returns true/false if there was a command in queue.
  */
-static size_t read_uart_command(uint8_t* cmd){
-	size_t i = 0;
+
+static bool read_uart_command(){
 	uint8_t 	 b;
+	uint8_t 	size_low;
+	uint8_t 	size_high;
+	uint32_t  	size;
 	// Check if there is any rdy command in the fifo
-	if (commands) {
-		// Read until the end of the command ('\n')
-		while (uart_recieve(b)) {
-			if (b == '\n') {
+	if (commands_count) {
+		// Read trash bytes untill # (start of cmd)
+		while (1) {
+			while(!uart_recieve(b));
+			if (b == '#') {
 				break;
 			}
-			cmd[i++] = b;
 		}
+		// Read 2 bytes for size
+		while(!uart_recieve(size_high));
+		while(!uart_recieve(size_low));
+		size = ((size_high << 8) & (0xFF00))  | size_low;
+		if (size > 0x1000) {
+			uart_puts("Command is to big punk(>0x1000)\n");
+			return false;
+		}
+
+		// Free prev command (it has been handled in the prev loop)
+		if (cmd) {
+			free(cmd);
+			cmd = 0;
+		}
+		// Allocate room for the new command.
+		cmd = (char*)malloc(size+1);
+
+		// Recv it byte by byte.
+		for (size_t i=0; i<size;i++) {
+			while (!uart_recieve(b));
+			cmd[i] = b;
+		}
+
 		// Decrement.
-		commands--;
+		commands_count--;
 
 		// Null terminate
-		cmd[i] = '\0';
-		return i;
-
+		cmd[size] = '\0';
+		//uart_puts("Command recieved.\n");
+		return true;
 	} else {
-
-		return 0;
+		// No commands
+		return false;
 	}
 }
 
@@ -703,35 +780,38 @@ static void free_list(i2c_sequence_t* list) {
 }
 
 /*
- * Handles a cmd.
- * The cmd is a byte sequence to match on the i2c bus:
- * An example would be:
- * [ 0x26 3] [0x27 *0x30 ? 0x30
- * [ ] 		--> Start/Stop bits
- * 0x26 	--> Byte to match
- * *0x30 	--> Byte to overwrite
- * ? 		--> Don't care byte
+ * Switch into sniff mode.
+ * In this mode all the start/stop bits and bytes are sent to serial.
  */
-static void handle_command(char* cmd, size_t size) {
-	char delim[] = " \t";
-	char* tok = strtok(cmd, delim);
+void command_update_sniff_mode(void) {
+	char *tok;
+	// Advance to the first sequence
+	tok = strtok(NULL, delim);
 
-	// Is this merely a stop/start command
-	if (!strcmp(tok, "stop")) {
-		disable();
-		return;
-	} else if (!strcmp(tok, "start")) {
-		enable();
-		return;
+	if (!strcmp(tok, "on")) {
+		symbol_count = 0;
+		sniff_mode = true;
+	} else {
+		sniff_mode = false;
 	}
+}
 
-	// No, this is a sequence we should follow. Lets ditch the old sequence
+/*
+ * Updates the global sequence list with given sequence taken from the global command.
+ */
+static void command_update_sequence(void) {
+	char *tok;
+
+	// First we free the old list.
 	free_list(i2c_byte_list_head);
 
 	// Create a new head, and make the curr list item point at it.
 	i2c_byte_list_head = (i2c_sequence_t*) malloc(sizeof(i2c_sequence_t));
 	i2c_byte_list_curr = i2c_byte_list_head;
 	i2c_byte_list_curr->hit = I2C_BYTE_NOT_SEEN;
+
+	// Advance to the first sequence
+	tok = strtok(NULL, delim);
 
 	// Tokenize the command.
 	// Remember that the command is of form: [ 0x12 *0x33 0x22... ] )
@@ -778,9 +858,30 @@ static void handle_command(char* cmd, size_t size) {
 	// Start matching from the curr ptr...
 	i2c_byte_list_curr = i2c_byte_list_head;
 	update_display_sequence();
+
 }
-
-
+/*
+ * Handles a cmd.
+ * The cmd is a byte sequence to match on the i2c bus:
+ * An example would be:
+ * [ 0x26 3] [0x27 *0x30 ? 0x30
+ * [ ] 		--> Start/Stop bits
+ * 0x26 	--> Byte to match
+ * *0x30 	--> Byte to overwrite
+ * ? 		--> Don't care byte
+ */
+static void handle_command() {
+	char* recved_cmd = strtok(cmd, delim);
+	// Call the right command handler according to the first token
+	for (size_t i=0; i < sizeof(commands)/sizeof(commands[0]); i++) {
+		if (!strcmp(commands[i].command, recved_cmd)) {
+			commands[i].func();
+			uart_puts("OK\n");
+			return;
+		}
+	}
+	uart_puts("Unkown command!\n");
+}
 
 
 int main(int argc, char* argv[]) {
@@ -805,16 +906,14 @@ int main(int argc, char* argv[]) {
 	disable();
 
 
-	uint8_t cmd[0x100];
 	size_t size = 0;
 	while (1) {
 		/*
 		 * Handle command.
 		 */
-		if ( (size = read_uart_command(cmd)) ) {
+		if (read_uart_command()) {
 			//LCD_BarLog(LCD_LOG_DEFAULT_COLOR,"%s\n", cmd);
-			handle_command((char*) cmd, size);
-			uart_puts("OK\n");
+			handle_command();
 		}
 
 		/*
@@ -822,7 +921,6 @@ int main(int argc, char* argv[]) {
 		 */
 		if (update_display_sequnce) {
 			update_display_sequence();
-			update_display_sequnce = false;
 		}
 	}
 

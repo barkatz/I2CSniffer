@@ -1,5 +1,6 @@
 import sys
 import cmd
+import struct
 from serial import Serial
 
 
@@ -12,7 +13,11 @@ class I2C(cmd.Cmd):
 		cmd.Cmd.__init__(self)
 
 	def _send_cmd(self, command):
-		self.s.write(command + '\n')
+		# Send size first, followed by cmd and \n.
+		# size does NOT contain the 2 bytes of size, # and $
+		raw_cmd = '#' + struct.pack('!H', len(command)) + command + '$'
+		#print raw_cmd
+		self.s.write(raw_cmd)
 		self.s.flush()
 
 	def _send_cmd_and_wait(self, command):
@@ -39,7 +44,7 @@ seq [command]
 	Note:
 	The sequence MUST start with a start bit ([)
 		"""
-		self._send_cmd_and_wait(seq)
+		self._send_cmd_and_wait("seq " + seq)
 
 		# Wait for an op
 	def do_start(self, line):
