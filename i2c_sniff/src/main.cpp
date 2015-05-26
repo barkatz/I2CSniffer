@@ -139,6 +139,7 @@ static void init_buttons();
  */
 static void init_lcd(void);
 
+
 /*
  * Enables/Disable the module.
  */
@@ -160,6 +161,8 @@ static void update_display_sequence();
 static void inline advance_i2c_byte();
 static void free_list(i2c_sequence_t* list);
 static void command_update_sequence(void);
+
+
 /*
  * Enables or disables sniff_mode according to the command
  */
@@ -681,14 +684,18 @@ void EXTI2_IRQHandler(void) {
 		if (sda) {
 			// slave could not process it. nothing we can do
 			write_byte_nacks++;
-			send_sequence(TYPE_NAK);
+			if (sniff_mode) {
+				send_sequence(TYPE_NAK);
+			}
 		} else {
 			// This is tricky. The master can now do 2 things:
 			// A) Send another byte
 			// B) Send a stop
 			// We now wait for clock to go up again. then we will check if its a data bit or stop bit
 			// No actual value yet for the next byte.
-			send_sequence(TYPE_ACK);
+			if (sniff_mode) {
+				send_sequence(TYPE_ACK);
+			}
 			bit_count = 0;
 			i2c_byte_list_curr->actual_value = 0;
 			state = WRITE_BYTE_UNK;
@@ -711,7 +718,9 @@ void EXTI2_IRQHandler(void) {
 
 			// if it was a stop bit, start scanning for start bit.
 			if (stop_bit) {
-				send_sequence(TYPE_STOP);
+				if (sniff_mode) {
+					send_sequence(TYPE_STOP);
+				}
 				match_stop_bit();
 				stop_bit_count++;
 				scan_start_bit();
@@ -731,10 +740,53 @@ void EXTI2_IRQHandler(void) {
 }
 #endif
 
+char temp[0x1000];
+int bla = 0;
 /*
  * Sends a sequence symbol via serial including an index.
  */
 static void inline send_sequence(I2C_SEQUNCE_TYPE type) {
+	char type_byte = 0;
+	if (bla > 0x1000) {
+		return;
+	}
+	switch (type) {
+		case TYPE_ACK:
+			type_byte = '+';
+			break;
+
+		case TYPE_NAK:
+			type_byte = '-';
+			break;
+
+		case TYPE_START:
+			type_byte = '[';
+			break;
+
+		case TYPE_STOP:
+			type_byte = ']';
+			break;
+
+		case TYPE_BYTE:
+			type_byte = 'B';
+			break;
+	}
+	if (type_byte  != 'B')
+		temp[bla] = type_byte;
+	else
+		temp[bla] = (char) (i2c_byte_list_curr->actual_value & 0xff);
+	bla++;
+
+//	// Send it only if we can send the whole byte
+//	if (tx_buffer_free_count() >= 1) {
+//		uart_send('#');
+//		uart_send(type_byte);
+//		uart_send((uint8_t)i2c_byte_list_curr->actual_value);
+//		uart_send(symbol_count&0xff);
+//		uart_send((uint8_t)((symbol_count&0xff00) >> 8));
+//		uart_send('$');
+//	}
+
 	// Reset for next one... and update index
 	i2c_byte_list_curr->actual_value = 0;
 	symbol_count++;
@@ -820,11 +872,38 @@ void command_update_sniff_mode(void) {
 	// Advance to the first sequence
 	tok = strtok(NULL, delim);
 
+	// First we have to disable the module before switching sniff mode on/off
+	disable();
+
 	if (!strcmp(tok, "on")) {
 		symbol_count = 0;
+
+		// Free the sequence lists.
+		free_list(i2c_byte_list_head);
+		i2c_byte_list_head = i2c_byte_list_curr = NULL;
+
+		// Create a dummy sequence list which will record the bytes/start/stop bits.
+		i2c_byte_list_head = (i2c_sequence_t*) malloc(sizeof(*i2c_byte_list_head));
+		i2c_byte_list_curr = i2c_byte_list_head;
+		i2c_byte_list_curr->next = 0;
+		i2c_byte_list_curr->actual_value = 0;
+		i2c_byte_list_curr->value = 0;
+		i2c_byte_list_curr->op= OP_MATCH;
+		i2c_byte_list_curr->type = TYPE_BYTE;
+
+		// Finally turn the sniff_mode flag on
 		sniff_mode = true;
+
+		LCD_BarLog(LCD_COLOR_GREEN, "Sniffing is on.\n");
 	} else {
+		// First turn off sniff_mode flag.
 		sniff_mode = false;
+
+		// Free the dummy link.
+		free_list(i2c_byte_list_head);
+		i2c_byte_list_head = i2c_byte_list_curr = NULL;
+
+		LCD_BarLog(LCD_COLOR_RED, "Sniffing is off.\n");
 	}
 }
 
@@ -894,13 +973,6 @@ static void command_update_sequence(void) {
 }
 /*
  * Handles a cmd.
- * The cmd is a byte sequence to match on the i2c bus:
- * An example would be:
- * [ 0x26 3] [0x27 *0x30 ? 0x30
- * [ ] 		--> Start/Stop bits
- * 0x26 	--> Byte to match
- * *0x30 	--> Byte to overwrite
- * ? 		--> Don't care byte
  */
 static void handle_command() {
 	char* recved_cmd = strtok(cmd, delim);
@@ -933,8 +1005,6 @@ int main(int argc, char* argv[]) {
 	init_gpio_port_interrupts_and_connect_to_nvic(SCL_PORT_IN, SCL_PIN_IN,	EXTI_Trigger_Rising);
 	init_usart(baudrate);
 
-	// Start looking for start bit.
-	// unmask_interrupt(SDA_PIN_IN);
 	// Start disabled.
 	disable();
 
@@ -945,12 +1015,11 @@ int main(int argc, char* argv[]) {
 		 * Handle command.
 		 */
 		if (read_uart_command()) {
-			//LCD_BarLog(LCD_LOG_DEFAULT_COLOR,"%s\n", cmd);
 			handle_command();
 		}
 
 		/*
-		 * Handle status updates.
+		 * Handle sequence updates.
 		 */
 		if (update_display_sequnce) {
 			update_display_sequence();

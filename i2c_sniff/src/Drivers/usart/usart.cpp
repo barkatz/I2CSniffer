@@ -35,6 +35,9 @@ void init_usart(uint32_t baud_rate) {
 
 }
 
+unsigned int tx_buffer_free_count(void) {
+	return tx_buffer.size() - tx_buffer.count();
+}
 bool uart_send(uint8_t elem) {
 
 	// try to push the elem to the tx queue. will not work if its full
