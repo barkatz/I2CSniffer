@@ -85,7 +85,7 @@ typedef struct i2c_sequence_t {
 	uint32_t	 			value;			// The value we expect to match: valid only incase of MATCHING bytes.
 	I2C_BYTE_HIT 			hit;			// Did we hit this sequence in the list?
 
-	i2c_sequence_t* 			next;
+	i2c_sequence_t* 		next;
 } i2c_sequnce_t;
 
 /*
@@ -93,7 +93,7 @@ typedef struct i2c_sequence_t {
  */
 typedef struct commands_t {
 	const char *command;
-	void (*func) (void);
+	bool (*func) (void);
 } commands_t;
 
 
@@ -145,6 +145,8 @@ static void init_lcd(void);
  */
 static void enable();
 static void disable();
+static bool command_enable();
+static bool command_disable();
 
 /*
  * Matches the current sequence link.
@@ -160,15 +162,15 @@ static bool match_start_bit();
 static void update_display_sequence();
 static void inline advance_i2c_byte();
 static void free_list(i2c_sequence_t* list);
-static void command_update_sequence(void);
+static bool command_update_sequence(void);
 
 
 /*
  * Enables or disables sniff_mode according to the command
  */
-static void command_update_sniff_mode(void);
+static bool command_update_sniff_mode(void);
 // Sends the current byte  via serial (including symbol index! to make sure we didn't lose any symbols)
-static void inline send_sequence(I2C_SEQUNCE_TYPE type);
+static void inline record_sequence(I2C_SEQUNCE_TYPE type);
 /*
  * USART Command parsing
  */
@@ -211,13 +213,14 @@ i2c_sequence_t* i2c_byte_list_curr 		= NULL;
 
 char delim[] = " \t";
 // Is this module in sniff mode? In this mode all bytes (including stop/start bits) are being sent to serial
-bool sniff_mode = false;
-size_t symbol_count = 0;
+volatile bool sniff_mode 			= false;	// Are we in sniff mode
+size_t symbol_count 				= 0; 		// How much we already have in the buffer
+size_t result_buffer_size 			= 0; 		// The size of the buffer to hold the sniff results
 
 // Global commands array from usart
 commands_t commands[] ={
-		{.command="start", 	.func = enable},
-		{.command="stop", 	.func = disable},
+		{.command="start", 	.func = command_enable},
+		{.command="stop", 	.func = command_disable},
 		{.command="seq", 	.func = command_update_sequence},
 		{.command="sniff", 	.func = command_update_sniff_mode},
 };
@@ -225,6 +228,16 @@ commands_t commands[] ={
 /*********************************************************************************************************
  *  Impl
  **********************************************************************************************************/
+bool command_enable(void){
+	enable();
+	return true;
+}
+
+bool command_disable(void){
+	disable();
+	return true;
+}
+
 bool inline read_port(uint32_t port, uint8_t pin) {
 	return (PORT_GPIOx(port)->IDR & PORT_PIN_MASK(pin)) != 0;
 }
@@ -255,11 +268,26 @@ static void update_display_sequence() {
 	LCD_LOG_DeInit(); // Bah this ugly -> without this the lines appear on the bottom...
 	LCD_LOG_SetLine(0);
 
+	// Update sniff mode!
+	if (sniff_mode) {
+		LCD_BarLog(LCD_COLOR_GREEN, "Sniffing is on (0x%x/0x%x)\n", symbol_count, result_buffer_size);
+		return;
+	} else {
+		LCD_BarLog(LCD_COLOR_RED, "Sniffing is off  (0x%x/0x%x)\n", symbol_count, result_buffer_size);
+	}
 
+	// If we have sniff result, don't display them. It is too slow.
+	// (It is possible to make it faster: Instead of printing each byte,
+	// Create a string of the entire sequence and print it.
+	// However for big buffers this is not good enough.)
+	if (result_buffer_size) {
+		LCD_BarLog(LCD_COLOR_GREEN, "Sniff result buffer not empty\n");
+		return;
+	}
 	// format it...
 	for (i2c_sequence_t* b = i2c_byte_list_head; b; b=b->next) {
 		// If we hit this sequence link - print +
-		if (b->hit == I2C_BYTE_MATCHED) {
+		if ((b->hit == I2C_BYTE_MATCHED) && (b->type== TYPE_BYTE)) {
 			LCD_BarLog(LCD_COLOR_WHITE, "+");
 		// If we hit it, but we missmatched it, and its a byte, print the value we saw in parentheses
 		} else if ((b->hit == I2C_BYTE_MISS_MATCHED) && (b->type == TYPE_BYTE)) {
@@ -285,9 +313,11 @@ static void update_display_sequence() {
 				LCD_BarLog(LCD_COLOR_WHITE, "] ");
 				break;
 			case TYPE_ACK:
+				LCD_BarLog(LCD_COLOR_WHITE, "+0x%lx ", b->actual_value);
+				break;
 			case TYPE_NAK:
-					LCD_BarLog(LCD_COLOR_WHITE, "list is invalid.\n");
-					break;
+				LCD_BarLog(LCD_COLOR_WHITE, "-0x%lx ", b->actual_value);
+				break;
 			}
 	}
 	LCD_BarLog(LCD_COLOR_WHITE, "\n");
@@ -460,7 +490,7 @@ void EXTI0_IRQHandler(void) {
 
 		// If we are sniffing, we need to send this byte via serial.
 		if (sniff_mode) {
-			send_sequence(TYPE_START);
+			record_sequence(TYPE_START);
 		}
 		// Move on.
 		state = MATCH_ADDRESS;
@@ -510,10 +540,6 @@ void EXTI2_IRQHandler(void) {
 		bit_count++;
 		if (bit_count == 8) {
 			state = ACK_ADDRESS_BIT;
-			// If we are sniffing, we need to send this byte via serial.
-			if (sniff_mode) {
-				send_sequence(TYPE_BYTE);
-			}
 		}
 		break; /* MATCH_ADDRESS */
 
@@ -534,13 +560,13 @@ void EXTI2_IRQHandler(void) {
 			//-> Address doesn't exist. search for start bit. If we are sniffing send the nak
 			address_nacked++;
 			if (sniff_mode) {
-				send_sequence(TYPE_NAK);
+				record_sequence(TYPE_NAK);
 			}
 			scan_start_bit();
 		} else {
 			// ACK -> Address found, slave answered.
 			if (sniff_mode) {
-				send_sequence(TYPE_ACK);
+				record_sequence(TYPE_ACK);
 			}
 			// If the next state is a OVERWRITE STATE we need to capture SCL fall. (to prepare the next bit).
 			// In that case, the interrupt will be triggered when ACK SCL has fallen.
@@ -585,9 +611,6 @@ void EXTI2_IRQHandler(void) {
 			}
 		}
 
-		if (sniff_mode) {
-			send_sequence(TYPE_BYTE);
-		}
 		// Update counters and wait for ack.
 		bread++;
 		break; /* READ_BYTE */
@@ -614,15 +637,16 @@ void EXTI2_IRQHandler(void) {
 		if (sda) {
 			// NACK -> Last byte the master wants to read. We expect stop bit.
 			if (sniff_mode) {
-				send_sequence(TYPE_NAK);
+				record_sequence(TYPE_NAK);
+			} else {
+				match_stop_bit();
 			}
-			match_stop_bit();
 			stop_bit_count++;
 			scan_start_bit();
 		} else {
 			// Ack!
 			if (sniff_mode) {
-				send_sequence(TYPE_ACK);
+				record_sequence(TYPE_ACK);
 			}
 			// ACK -> Master wants to read more bytes
 			bit_count = 0;
@@ -667,9 +691,6 @@ void EXTI2_IRQHandler(void) {
 				state = WRITE_BYTE_ACK;
 			}
 			bwrite++;
-			if (sniff_mode) {
-				send_sequence(TYPE_BYTE);
-			}
 		}
 
 		break;
@@ -685,7 +706,7 @@ void EXTI2_IRQHandler(void) {
 			// slave could not process it. nothing we can do
 			write_byte_nacks++;
 			if (sniff_mode) {
-				send_sequence(TYPE_NAK);
+				record_sequence(TYPE_NAK);
 			}
 		} else {
 			// This is tricky. The master can now do 2 things:
@@ -694,7 +715,7 @@ void EXTI2_IRQHandler(void) {
 			// We now wait for clock to go up again. then we will check if its a data bit or stop bit
 			// No actual value yet for the next byte.
 			if (sniff_mode) {
-				send_sequence(TYPE_ACK);
+				record_sequence(TYPE_ACK);
 			}
 			bit_count = 0;
 			i2c_byte_list_curr->actual_value = 0;
@@ -718,10 +739,12 @@ void EXTI2_IRQHandler(void) {
 
 			// if it was a stop bit, start scanning for start bit.
 			if (stop_bit) {
+				// If sniffing record this byte and move on
 				if (sniff_mode) {
-					send_sequence(TYPE_STOP);
+					record_sequence(TYPE_STOP);
+				} else {
+					match_stop_bit();
 				}
-				match_stop_bit();
 				stop_bit_count++;
 				scan_start_bit();
 			} else {
@@ -740,63 +763,37 @@ void EXTI2_IRQHandler(void) {
 }
 #endif
 
-char temp[0x1000];
-int bla = 0;
+
+
+
 /*
- * Sends a sequence symbol via serial including an index.
+ * Records the current sequence into the list
  */
-static void inline send_sequence(I2C_SEQUNCE_TYPE type) {
-	char type_byte = 0;
-	if (bla > 0x1000) {
-		return;
-	}
-	switch (type) {
-		case TYPE_ACK:
-			type_byte = '+';
-			break;
+static void inline record_sequence(I2C_SEQUNCE_TYPE type) {
 
-		case TYPE_NAK:
-			type_byte = '-';
-			break;
-
-		case TYPE_START:
-			type_byte = '[';
-			break;
-
-		case TYPE_STOP:
-			type_byte = ']';
-			break;
-
-		case TYPE_BYTE:
-			type_byte = 'B';
-			break;
-	}
-	if (type_byte  != 'B')
-		temp[bla] = type_byte;
-	else
-		temp[bla] = (char) (i2c_byte_list_curr->actual_value & 0xff);
-	bla++;
-
-//	// Send it only if we can send the whole byte
-//	if (tx_buffer_free_count() >= 1) {
-//		uart_send('#');
-//		uart_send(type_byte);
-//		uart_send((uint8_t)i2c_byte_list_curr->actual_value);
-//		uart_send(symbol_count&0xff);
-//		uart_send((uint8_t)((symbol_count&0xff00) >> 8));
-//		uart_send('$');
-//	}
-
-	// Reset for next one... and update index
+	// Save if this was start/stop nak/acked byte, and advanced to the next.
+	i2c_byte_list_curr->type = type;
+	i2c_byte_list_curr = i2c_byte_list_curr->next;
 	i2c_byte_list_curr->actual_value = 0;
 	symbol_count++;
+
+	if (symbol_count >= result_buffer_size) {
+		if (i2c_byte_list_curr) {
+			uart_puts("WTF");
+			(*(int*) (0)) = 5;
+		}
+
+	}
+	// If we finished turn off sniffing.
+	if (!i2c_byte_list_curr) {
+		sniff_mode = false;
+	}
 }
 
 /*
  * Reads a complete uart command into cmd.
  * Returns true/false if there was a command in queue.
  */
-
 static bool read_uart_command(){
 	uint8_t 	 b;
 	uint8_t 	size_low;
@@ -840,7 +837,7 @@ static bool read_uart_command(){
 		// Null terminate
 		cmd[size] = '\0';
 		//uart_puts("Command recieved.\n");
-		return true;
+ 		return true;
 	} else {
 		// No commands
 		return false;
@@ -867,7 +864,7 @@ static void free_list(i2c_sequence_t* list) {
  * Switch into sniff mode.
  * In this mode all the start/stop bits and bytes are sent to serial.
  */
-void command_update_sniff_mode(void) {
+static bool command_update_sniff_mode(void) {
 	char *tok;
 	// Advance to the first sequence
 	tok = strtok(NULL, delim);
@@ -875,8 +872,15 @@ void command_update_sniff_mode(void) {
 	// First we have to disable the module before switching sniff mode on/off
 	disable();
 
-	if (!strcmp(tok, "on")) {
+	/*
+	 *  Are we turning sniff mode on?
+	 */
+	if (!strcmp(tok, "start")) {
 		symbol_count = 0;
+
+		// Get the number of symbols.
+		tok = strtok(NULL, delim);
+		result_buffer_size = strtol(tok, NULL, 0);
 
 		// Free the sequence lists.
 		free_list(i2c_byte_list_head);
@@ -885,32 +889,94 @@ void command_update_sniff_mode(void) {
 		// Create a dummy sequence list which will record the bytes/start/stop bits.
 		i2c_byte_list_head = (i2c_sequence_t*) malloc(sizeof(*i2c_byte_list_head));
 		i2c_byte_list_curr = i2c_byte_list_head;
-		i2c_byte_list_curr->next = 0;
-		i2c_byte_list_curr->actual_value = 0;
-		i2c_byte_list_curr->value = 0;
-		i2c_byte_list_curr->op= OP_MATCH;
-		i2c_byte_list_curr->type = TYPE_BYTE;
+
+		// Init the list
+		for (size_t i=0; i<result_buffer_size-1; i++) {
+			i2c_byte_list_curr->next 			= (i2c_sequence_t*) malloc(sizeof(i2c_sequence_t ));
+			if (!i2c_byte_list_curr->next) {
+				uart_puts("Allocating the buffer failed. Try a smaller size...");
+				free_list(i2c_byte_list_head);
+				i2c_byte_list_head = i2c_byte_list_curr = 0;
+				return false;
+			}
+			i2c_byte_list_curr->actual_value 	= 0;
+			i2c_byte_list_curr->value 			= 0;
+			i2c_byte_list_curr->op				= OP_MATCH;
+			i2c_byte_list_curr->type 			= TYPE_BYTE;
+			i2c_byte_list_curr 					= i2c_byte_list_curr->next;
+		}
+		// And init the last one
+		i2c_byte_list_curr->next 			= 0;
+		i2c_byte_list_curr->actual_value 	= 0;
+		i2c_byte_list_curr->value 			= 0;
+		i2c_byte_list_curr->op				= OP_MATCH;
+		i2c_byte_list_curr->type 			= TYPE_BYTE;
+
 
 		// Finally turn the sniff_mode flag on
 		sniff_mode = true;
-
-		LCD_BarLog(LCD_COLOR_GREEN, "Sniffing is on.\n");
-	} else {
+	/*
+	 * Stop snif mode
+	 */
+	} else if (!strcmp(tok, "stop")) {
 		// First turn off sniff_mode flag.
 		sniff_mode = false;
 
-		// Free the dummy link.
+		// Free the list and zero counters.
 		free_list(i2c_byte_list_head);
-		i2c_byte_list_head = i2c_byte_list_curr = NULL;
+		i2c_byte_list_head  = 0;
+		i2c_byte_list_curr  = 0;
+		result_buffer_size 	= 0;
+		symbol_count		= 0;
+	/*
+	 * Get sniff records
+	 */
+	} else if (!strcmp(tok, "get")) {
+		i2c_sequence_t* c = i2c_byte_list_head;
+		char buf[0x10];
+		while (c) {
+			switch (c->type) {
+				case TYPE_ACK:
+					snprintf(buf, sizeof(buf), "+0x%lx ", c->actual_value);
+					break;
 
-		LCD_BarLog(LCD_COLOR_RED, "Sniffing is off.\n");
+				case TYPE_NAK:
+					snprintf(buf, sizeof(buf), "-0x%lx ", c->actual_value);
+					break;
+
+				case TYPE_START:
+					snprintf(buf, sizeof(buf), "[ ");
+					break;
+
+				case TYPE_STOP:
+					snprintf(buf, sizeof(buf), "] ");
+					break;
+
+				case TYPE_BYTE:
+					LCD_BarLog(LCD_COLOR_RED, "Impossible type byte");
+					uart_puts("Impossible type byte");
+					break;
+			}
+			uart_puts(buf);
+			c = c->next;
+		}
+
+		// Free the list and zero counters.
+		sniff_mode = false;
+		free_list(i2c_byte_list_head);
+		i2c_byte_list_head  = 0;
+		i2c_byte_list_curr  = 0;
+		result_buffer_size 	= 0;
+		symbol_count		= 0;
 	}
+
+	return true;
 }
 
 /*
  * Updates the global sequence list with given sequence taken from the global command.
  */
-static void command_update_sequence(void) {
+static bool command_update_sequence(void) {
 	char *tok;
 
 	// First we free the old list.
@@ -960,6 +1026,13 @@ static void command_update_sequence(void) {
 		// Allocate a new room for the next token if needed.
 		if (tok) {
 			i2c_byte_list_curr->next 		= (i2c_sequence_t*) malloc(sizeof(i2c_sequence_t));
+			if (!i2c_byte_list_curr->next) {
+				uart_puts("Sequence is too long... Try a shorter one");
+				free_list(i2c_byte_list_head);
+				i2c_byte_list_curr = NULL;
+				i2c_byte_list_head = NULL;
+				return false;
+			}
 		} else {
 			i2c_byte_list_curr->next 	= NULL;
 		}
@@ -969,7 +1042,7 @@ static void command_update_sequence(void) {
 	// Start matching from the curr ptr...
 	i2c_byte_list_curr = i2c_byte_list_head;
 	update_display_sequence();
-
+	return true;
 }
 /*
  * Handles a cmd.
@@ -979,9 +1052,13 @@ static void handle_command() {
 	// Call the right command handler according to the first token
 	for (size_t i=0; i < sizeof(commands)/sizeof(commands[0]); i++) {
 		if (!strcmp(commands[i].command, recved_cmd)) {
-			commands[i].func();
-			uart_puts("OK\n");
-			return;
+			if (commands[i].func()) {
+				uart_puts("OK\n");
+				return;
+			} else {
+				uart_puts("<ERROR>\n");
+				return;
+			}
 		}
 	}
 	uart_puts("Unkown command!\n");
@@ -1008,8 +1085,6 @@ int main(int argc, char* argv[]) {
 	// Start disabled.
 	disable();
 
-
-	size_t size = 0;
 	while (1) {
 		/*
 		 * Handle command.

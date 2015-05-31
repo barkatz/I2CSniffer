@@ -32,16 +32,18 @@ void init_usart(uint32_t baud_rate) {
 
 	// And start the RX interrupt. Tx interrupt will be activated only when we have something to send.
 	USART_ITConfig(EVAL_COM1, USART_IT_RXNE, ENABLE);
+//	USART_ITConfig(EVAL_COM1, USART_IT_TXE, ENABLE);
 
 }
 
 unsigned int tx_buffer_free_count(void) {
 	return tx_buffer.size() - tx_buffer.count();
 }
-bool uart_send(uint8_t elem) {
 
+bool uart_send(uint8_t elem) {
 	// try to push the elem to the tx queue. will not work if its full
 	bool pushed = tx_buffer.push(elem);
+	// Turn on interrupt...
 	USART_ITConfig(EVAL_COM1, USART_IT_TXE, ENABLE);
 	return pushed;
 }
@@ -57,8 +59,13 @@ bool uart_recieve(uint8_t &elem) {
 }
 
 void uart_puts(const char* s) {
+	bool ret;
+
 	while(*s) {
-		while (!uart_send(*s++));
+		do {
+			ret = uart_send(*s);
+		} while (!ret);
+		s++;
 	}
 }
 
@@ -86,7 +93,8 @@ extern "C" void USART3_IRQHandler(void) {
 		// Pop an element from the tx queue
 		uint8_t elem = 0;
 		if (tx_buffer.pop(elem) == false) {
-			// This is bad
+			// This is also bad
+			return;
 		}
 		/* Write one byte to the transmit data register */
 		USART_SendData(EVAL_COM1, elem);

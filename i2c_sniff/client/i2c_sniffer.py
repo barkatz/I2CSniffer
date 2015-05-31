@@ -28,14 +28,15 @@ class I2C(cmd.Cmd):
 		self.s.write(raw_cmd)
 		self.s.flush()
 
-	def _send_cmd_and_wait(self, command):
+	def _send_cmd_and_wait(self, command, prompt=True):
 		"""
 		Sends a command and waits for a reply.
 		The reply should end with \n
 		"""
 		self._send_cmd(command)
 		res = self.s.readline()
-		self._prompt(res.replace('\n',''))
+		if prompt:
+			self._prompt(res.replace('\n',''))
 		return res
 
 	def do_seq(self, seq):
@@ -59,77 +60,91 @@ seq [command]
 		"""
 		self._send_cmd_and_wait("seq " + seq)
 
+
+	def _is_a_number(self, arg):
+		try:
+			int(arg, 0)
+			return True
+		except:
+			return False
+
 	def do_sniff(self, sniff_mode):
 		"""
-sniff 
+sniff [on/off/get/loop] <size>
 
-Starts sniff mode. ctrl+c to break
+start  - starts sniff mode. <size> the buffer size on the device to use.
+stop 	- stops sniff mode
+get 	- get the sniff results.
+loop 	- starts/gets results in a loop :)
 		"""
-
-		res = self._send_cmd_and_wait("sniff on")		
-		self._prompt("Turned sniffing on: " + res.replace('\n', ''))
-		res = self._send_cmd_and_wait('start')
-		self._prompt("Enabled: " + res.replace('\n', ''))
-
-		
-		#t = threading.Thread(target = self._handle_sniff)
-		#t.start()
-		# try:
-		# 	while True:
-		# 		pass
-		# except KeyboardInterrupt, ki:
-		# 	self._prompt("Stopping")
-		current_count = -1
-		buf = ''
-		try:	
-			while True:
-				 c = self.s.read(1)
-
-				 if (c != '#'):
-				 	continue
-				 s = self.s.read(5)
-				 
-				 if not s.endswith('$'):
-				 	self._prompt("Out of sync: %s" % s)
-				 	continue
-				 t = s[0]
-				 v = s[1]
-				 seq = struct.unpack("H", s[2:4])[0]
-				 if (current_count == -1):
-				 	current_count = seq
-				 else:
-				 	if (current_count != seq - 1):
-				 		print "Missed?"
-				 current_count = seq
-				 
-				 if (t == 'B'):
-				  	buf += hex(ord(v))
-				 elif t == '+' or t == '-':
-				 	buf += t + ' ' 
-				 elif t == '[' or t == ']':
-				 	buf += ' ' + t + ' '
-				 
-
-				 if t == ']':
-					print buf
-				 	buf = ''
+		if (len(sniff_mode.split()) < 1):
+			print "must suply an arg."
+			return
+		cmd = sniff_mode.split()[0]
+		if cmd == 'start':
+			if (len(sniff_mode.split()) < 2):
+				size = 0x100
+			else:
+				size =  sniff_mode.split()[1]
+				# Make sure this is a number:
+				if not self._is_a_number(size):
+					self._prompt("Size must be a number not '%s'" % size)
+					return
+			
+			self._prompt("Turned sniffing on: ")
+			res  = self._send_cmd_and_wait("sniff start %s" % size)		
+			if 'ERROR' in res:
+				return
 
 
-		except KeyboardInterrupt, ki:
-			self._prompt("Closing sniffer...")				  	
+			self._prompt("Enabling interrupts: ")
+			res = self._send_cmd_and_wait('start')
+			if 'ERROR' in res:
+				return
 
-
-		res = self._send_cmd_and_wait("sniff off")
-
-		# Flush pipe....
-		buf = ''
-		while not buf.endswith('OK\n'):
-			buf += self.s.read(1)
-
-		self._prompt("Waiting for thread to finish...")
-		self._prompt("Done.")
 
 			
+			self._prompt("sniff get --> To get the result of the current sniff")
+		
+		elif cmd == 'stop':
+			res = self._send_cmd_and_wait("sniff stop")		
+		
+		elif cmd == 'get':
+			res = self._send_cmd_and_wait("sniff get", prompt = False)
+			res = res.replace('OK\n', '')
+			self._prompt(res.replace('[', '\n['))
+
+		elif cmd == 'loop':
+			if (len(sniff_mode.split()) < 2):
+				size = 0x100
+			else:
+				size =  sniff_mode.split()[1]
+				# Make sure this is a number:
+				if not self._is_a_number(size):
+					self._prompt("Size must be a number not '%s'" % size)
+					return
+			try:
+				while True:
+					res  = self._send_cmd_and_wait("sniff start %s" % size, prompt = False)
+					if 'ERROR' in res:
+						self._prompt(res)
+						return
+		
+					res = self._send_cmd_and_wait("sniff get", prompt = False)
+					if 'ERROR' in res:
+						self._prompt(res)
+						return
+
+					res = res.replace('OK\n', '')
+					self._prompt(res.replace('[', '\n['))
+
+			except KeyboardInterrupt, ki:
+				self._prompt("Stoping...")
+				res = self._send_cmd_and_wait("sniff stop")	
+
+
+
+
 
 	def _handle_sniff(self):
 		for i in xrange(1000):
