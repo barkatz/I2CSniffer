@@ -68,6 +68,7 @@ seq [command]
 		except:
 			return False
 
+
 	def do_sniff(self, sniff_mode):
 		"""
 sniff [on/off/get/loop] <size>
@@ -129,18 +130,25 @@ loop 	- starts/gets results in a loop :)
 					if 'ERROR' in res:
 						self._prompt(res)
 						return
-		
+
+					res = self._send_cmd_and_wait('start', prompt = False)
+					if 'ERROR' in res:
+						self._prompt(res)
+						return
+					#raw_input('ok?')
 					res = self._send_cmd_and_wait("sniff get", prompt = False)
 					if 'ERROR' in res:
 						self._prompt(res)
 						return
 
 					res = res.replace('OK\n', '')
-					self._prompt(res.replace('[', '\n['))
+					print (res.replace('[', '\n[')),
 
 			except KeyboardInterrupt, ki:
 				self._prompt("Stoping...")
-				res = self._send_cmd_and_wait("sniff stop")	
+				res = self._send_cmd_and_wait("sniff stop")
+		else:
+			self._prompt('help sniff ^^')	
 
 
 

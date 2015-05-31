@@ -281,7 +281,6 @@ static void update_display_sequence() {
 	// Create a string of the entire sequence and print it.
 	// However for big buffers this is not good enough.)
 	if (result_buffer_size) {
-		LCD_BarLog(LCD_COLOR_GREEN, "Sniff result buffer not empty\n");
 		return;
 	}
 	// format it...
@@ -772,9 +771,18 @@ void EXTI2_IRQHandler(void) {
 static void inline record_sequence(I2C_SEQUNCE_TYPE type) {
 
 	// Save if this was start/stop nak/acked byte, and advanced to the next.
-	i2c_byte_list_curr->type = type;
-	i2c_byte_list_curr = i2c_byte_list_curr->next;
-	i2c_byte_list_curr->actual_value = 0;
+	if (type == TYPE_BYTE) {
+		uart_puts("WTF2");
+		(*(int*) (0)) = 6;
+		while (1) {}
+	}
+	// Save the current type and mark the current link as hit
+	i2c_byte_list_curr->type 			= type;
+	i2c_byte_list_curr->hit				= I2C_BYTE_MATCHED;
+
+	// Advance to the next
+	i2c_byte_list_curr 					= i2c_byte_list_curr->next;
+	i2c_byte_list_curr->actual_value 	= 0;
 	symbol_count++;
 
 	if (symbol_count >= result_buffer_size) {
@@ -900,17 +908,20 @@ static bool command_update_sniff_mode(void) {
 				return false;
 			}
 			i2c_byte_list_curr->actual_value 	= 0;
-			i2c_byte_list_curr->value 			= 0;
+			i2c_byte_list_curr->value 			= 123;
 			i2c_byte_list_curr->op				= OP_MATCH;
 			i2c_byte_list_curr->type 			= TYPE_BYTE;
+			i2c_byte_list_curr->hit				= I2C_BYTE_NOT_SEEN;
+
 			i2c_byte_list_curr 					= i2c_byte_list_curr->next;
 		}
 		// And init the last one
 		i2c_byte_list_curr->next 			= 0;
 		i2c_byte_list_curr->actual_value 	= 0;
-		i2c_byte_list_curr->value 			= 0;
+		i2c_byte_list_curr->value 			= 321;
 		i2c_byte_list_curr->op				= OP_MATCH;
 		i2c_byte_list_curr->type 			= TYPE_BYTE;
+		i2c_byte_list_curr->hit				= I2C_BYTE_NOT_SEEN;
 
 
 		// Finally turn the sniff_mode flag on
@@ -923,15 +934,17 @@ static bool command_update_sniff_mode(void) {
 		sniff_mode = false;
 
 		// Free the list and zero counters.
-		free_list(i2c_byte_list_head);
-		i2c_byte_list_head  = 0;
-		i2c_byte_list_curr  = 0;
-		result_buffer_size 	= 0;
-		symbol_count		= 0;
+//		free_list(i2c_byte_list_head);
+//		i2c_byte_list_head  = 0;
+//		i2c_byte_list_curr  = 0;
+//		result_buffer_size 	= 0;
+//		symbol_count		= 0;
 	/*
 	 * Get sniff records
 	 */
 	} else if (!strcmp(tok, "get")) {
+		// First stop sniffing...
+		sniff_mode = false;
 		i2c_sequence_t* c = i2c_byte_list_head;
 		char buf[0x10];
 		while (c) {
@@ -953,8 +966,14 @@ static bool command_update_sniff_mode(void) {
 					break;
 
 				case TYPE_BYTE:
-					LCD_BarLog(LCD_COLOR_RED, "Impossible type byte");
-					uart_puts("Impossible type byte");
+					// This might happen if the list is not fully full (buffer size was too big)
+					if (c->hit != I2C_BYTE_NOT_SEEN) {
+						LCD_BarLog(LCD_COLOR_RED, "Impossible type byte\n");
+						uart_puts("Impossible type byte");
+					} else {
+						c = NULL;
+						continue;
+					}
 					break;
 			}
 			uart_puts(buf);
@@ -962,7 +981,6 @@ static bool command_update_sniff_mode(void) {
 		}
 
 		// Free the list and zero counters.
-		sniff_mode = false;
 		free_list(i2c_byte_list_head);
 		i2c_byte_list_head  = 0;
 		i2c_byte_list_curr  = 0;
