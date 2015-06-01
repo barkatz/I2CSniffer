@@ -28,15 +28,16 @@ class I2C(cmd.Cmd):
 		self.s.write(raw_cmd)
 		self.s.flush()
 
-	def _send_cmd_and_wait(self, command, prompt=True):
+	def _send_cmd_and_wait(self, command, prompt=True, errorprompt=True):
 		"""
 		Sends a command and waits for a reply.
 		The reply should end with \n
 		"""
 		self._send_cmd(command)
 		res = self.s.readline()
-		if prompt:
+		if prompt or (errorprompt and 'ERROR' in res):
 			self._prompt(res.replace('\n',''))
+
 		return res
 
 	def do_seq(self, seq):
@@ -126,19 +127,16 @@ loop 	- starts/gets results in a loop :)
 					return
 			try:
 				while True:
-					res  = self._send_cmd_and_wait("sniff start %s" % size, prompt = False)
+					res  = self._send_cmd_and_wait("sniff start %s" % size, prompt = False, errorprompt = True)
 					if 'ERROR' in res:
-						self._prompt(res)
 						return
 
-					res = self._send_cmd_and_wait('start', prompt = False)
+					res = self._send_cmd_and_wait('start', prompt = False, errorprompt = True)
 					if 'ERROR' in res:
-						self._prompt(res)
 						return
 					#raw_input('ok?')
-					res = self._send_cmd_and_wait("sniff get", prompt = False)
+					res = self._send_cmd_and_wait("sniff get", prompt = False, errorprompt = True)
 					if 'ERROR' in res:
-						self._prompt(res)
 						return
 
 					res = res.replace('OK\n', '')
@@ -147,6 +145,13 @@ loop 	- starts/gets results in a loop :)
 			except KeyboardInterrupt, ki:
 				self._prompt("Stoping...")
 				res = self._send_cmd_and_wait("sniff stop")
+				import time
+				time.sleep(1)
+				# Emptying pipe...
+				while self.s.inWaiting() != 0:
+					time.sleep(0.01)
+					print "--->", self.s.read(self.s.inWaiting())
+				self._prompt("Done ^^")
 		else:
 			self._prompt('help sniff ^^')	
 

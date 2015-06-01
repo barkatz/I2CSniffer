@@ -908,7 +908,7 @@ static bool command_update_sniff_mode(void) {
 				return false;
 			}
 			i2c_byte_list_curr->actual_value 	= 0;
-			i2c_byte_list_curr->value 			= 123;
+//			i2c_byte_list_curr->value 			= 123;
 			i2c_byte_list_curr->op				= OP_MATCH;
 			i2c_byte_list_curr->type 			= TYPE_BYTE;
 			i2c_byte_list_curr->hit				= I2C_BYTE_NOT_SEEN;
@@ -918,7 +918,7 @@ static bool command_update_sniff_mode(void) {
 		// And init the last one
 		i2c_byte_list_curr->next 			= 0;
 		i2c_byte_list_curr->actual_value 	= 0;
-		i2c_byte_list_curr->value 			= 321;
+//		i2c_byte_list_curr->value 			= 321;
 		i2c_byte_list_curr->op				= OP_MATCH;
 		i2c_byte_list_curr->type 			= TYPE_BYTE;
 		i2c_byte_list_curr->hit				= I2C_BYTE_NOT_SEEN;
